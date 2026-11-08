@@ -33,13 +33,15 @@ Linux 输出文件名用 `../../tdx-api-service`。也可通过 `LIANGCE_TDX_API
 
 ## GitHub 备份与 GitHub Pages
 
-目标仓库名称：**LiangCe**。备份默认准备为私有，实际推送需要登录 GitHub 并确定所属账号。
+源码备份：**https://github.com/nnn256/LiangCe**（私有）。网站发布文件：**https://github.com/nnn256/LiangCe-site**（公开，仅网页资源和行情快照）。
+
+网站地址：https://nnn256.github.io/LiangCe-site/
 
 GitHub Pages 是静态发布；网页显示真实行情快照、完整已发布日线和评分。页面始终标明行情日期与发布日期，不把已发布数据称为实时行情。可在浏览器改变策略后基于已发布日线重新评分。V2本地任务文件不上传到 GitHub Pages，在完整网页服务中读取。
 
 工作流 `.github/workflows/pages.yml` 在仓库变量 `ENABLE_PAGES=true` 后启用，在推送、手动触发及北京时间交易日12:20和15:20运行：构建通达信服务 → 获取真实市场数据 → 导出静态站点 → 发布。GitHub调度可能延迟；采集失败时工作流失败，已有部署继续保留。
 
-GitHub Free 的 Pages 通常需要公开仓库；私有仓库 Pages 需要相应付费计划。不会在未决定可见性时擅自公开代码。
+本账号的私有仓库不支持 Pages，已按用户选择采用“私有源码＋公开网站产物”。私有仓库通过仅限网站仓库的部署密钥 `SITE_DEPLOY_KEY` 同步发布文件。后端Python、Go源码、本机V2任务和个人配置不发布到网站仓库。
 
 本地生成相同的静态站点：
 

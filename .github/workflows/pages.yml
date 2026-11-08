@@ -7,8 +7,6 @@ on:
     - cron: '20 4,7 * * 1-5'
 permissions:
   contents: read
-  pages: write
-  id-token: write
 concurrency:
   group: liangce-pages
   cancel-in-progress: false
@@ -17,9 +15,6 @@ jobs:
     if: vars.ENABLE_PAGES == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -49,10 +44,8 @@ jobs:
         run: python tools/collect_snapshot.py
       - name: Build published site
         run: python tools/build_site.py
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: _site
-      - name: Deploy
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Publish website files to the public site repository
+        env:
+          LIANGCE_SITE_REPOSITORY: nnn256/LiangCe-site
+          LIANGCE_SITE_DEPLOY_KEY: ${{ secrets.SITE_DEPLOY_KEY }}
+        run: python tools/publish_site.py
