@@ -2,7 +2,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-from tools.build_site import export
+from tools.build_site import export,versioned_index
 
 class ExportTests(unittest.TestCase):
     def test_missing_legacy_short_record_is_empty_and_private_paths_are_not_published(self):
@@ -17,5 +17,13 @@ class ExportTests(unittest.TestCase):
             for file in out.glob('data/**/*.json'):self.assertNotIn('private-',file.read_text(encoding='utf8'))
             self.assertFalse((out/'web_server.py').exists())
             self.assertEqual(result['histories'],['600000'])
+            html=(out/'index.html').read_text(encoding='utf8')
+            self.assertIn('web-bridge.js?v=',html)
+            self.assertIn('LIANGCE_ASSET_VERSION',html)
+
+    def test_changed_script_invalidates_browser_resource_urls(self):
+        assets={'index.html':'<script src="app.js"></script>','app.js':'old'}
+        old=versioned_index(assets);assets['app.js']='updated'
+        self.assertNotEqual(old,versioned_index(assets))
 
 if __name__=='__main__':unittest.main()

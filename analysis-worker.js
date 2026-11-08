@@ -1,4 +1,4 @@
-importScripts('strategy.js','analysis-model.js');
+importScripts('strategy.js'+self.location.search,'analysis-model.js'+self.location.search);
 self.onmessage=event=>{
  const {token,histories,params}=event.data;const results=[],errors=[];
  for(const history of histories){

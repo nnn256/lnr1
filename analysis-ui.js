@@ -54,7 +54,7 @@
  }
  async function start(){
   if(started||!window.pywebview?.api)return;
-  started=true;worker=new Worker('analysis-worker.js');
+  started=true;worker=new Worker('analysis-worker.js'+(window.LIANGCE_ASSET_VERSION?'?v='+window.LIANGCE_ASSET_VERSION:''));
   try{await pywebview.api.configure_analysis(LiangceApp.analysisParams());poll();}
   catch(error){started=false;$('#batch-message').textContent='批量分析启动失败';console.error(error);}
  }

@@ -2,6 +2,8 @@
 import argparse
 import datetime as dt
 import json
+import hashlib
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -13,6 +15,11 @@ from tools.site_files import ASSETS
 def write(path,value):
     path.parent.mkdir(parents=True,exist_ok=True)
     path.write_text(json.dumps(value,ensure_ascii=False,separators=(',',':'),allow_nan=False),encoding='utf8')
+
+def versioned_index(assets):
+    digest=hashlib.sha256(''.join(name+assets[name] for name in sorted(assets) if name.endswith(('.js','.css'))).encode()).hexdigest()[:16]
+    html=re.sub(r'(src|href)="([^"]+)"',lambda match:match[1]+'="'+match[2]+'?v='+digest+'"' if match[2] in assets else match[0],assets['index.html'])
+    return html.replace('<script src=',f'<script>window.LIANGCE_ASSET_VERSION="{digest}";</script>\n  <script src=',1)
 
 def export(data_dir, output):
     data_dir=Path(data_dir);output=Path(output)
@@ -27,6 +34,8 @@ def export(data_dir, output):
     for name in ASSETS:
         p=output/name;p.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(ROOT/name,p)
     (output/'web-config.js').write_text("window.LIANGCE_WEB_CONFIG={mode:'snapshot',live_api:'https://liangce-v3-api-production.up.railway.app'};\n",encoding='utf8')
+    assets={name:(output/name).read_text(encoding='utf-8-sig') for name in ASSETS}
+    (output/'index.html').write_text(versioned_index(assets),encoding='utf8')
     (output/'.nojekyll').write_text('',encoding='utf8')
     names={item['code']:item['name'] for item in market['securities']}
     histories=[];issues=[];latest=[];bars_total=0
