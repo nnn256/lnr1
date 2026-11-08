@@ -145,7 +145,7 @@
     const sig=signature(item);
     if(snapshot&&history?.code===item.code&&sig===lastSignature){
       history=item;
-      $('#tv-source').textContent=`${item.name||item.code} ${item.code} · ${item.history_note||'缓存待核验'} · ${item.source} · ${item.adjusted?'前复权来源标记':'未复权'} · ${item.first_date} → ${item.last_date}`;
+      $('#tv-source').textContent=`${item.name||item.code} ${item.code} · ${item.history_note||'缓存待核验'} · ${item.source} · ${item.adjustment==='provider_unspecified'?'复权口径未认证':item.adjusted?'前复权来源标记':'未复权'} · ${item.first_date} → ${item.last_date}`;
       return;
     }
     history=item;aggregate=M.aggregateBars(item.bars,period);cursor=null;snapshot=null;lastSignature=sig;pending=null;manual=stored.get(item.code+':'+period)||[];$('#tv-code').value=item.code;$('#tv-symbol').value=item.code;render();
