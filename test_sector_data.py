@@ -1,5 +1,8 @@
 import unittest
-from sector_data import rank_data
+import io
+import urllib.error
+from unittest.mock import patch
+from sector_data import rank_data,request
 
 def row(code,closes):return dict(code=code,bars=[dict(date=f'2026-10-{i+1:02}',close=c,amount=1) for i,c in enumerate(closes)])
 
@@ -20,5 +23,11 @@ class SectorTests(unittest.TestCase):
     def test_stale_sector_has_no_current_rank_or_return(self):
         rows=[row('A',[100]*26),row('B',[100]*25)];rank_data(rows)
         self.assertIsNone(rows[1]['rank']);self.assertIsNone(rows[1]['return_5d']);self.assertEqual(rows[1]['history_as_of'],'2026-10-25')
+    def test_transient_network_failure_retries_but_is_bounded(self):
+        with patch('sector_data.time.sleep'),patch('sector_data.urllib.request.urlopen',side_effect=[TimeoutError('temporary'),io.BytesIO(b'{"rc":0,"data":{"total":1}}')]) as fetch:
+            self.assertEqual(request('https://example.test',{})['total'],1);self.assertEqual(fetch.call_count,2)
+        with patch('sector_data.time.sleep'),patch('sector_data.urllib.request.urlopen',side_effect=urllib.error.URLError('offline')) as fetch:
+            with self.assertRaises(urllib.error.URLError):request('https://example.test',{})
+            self.assertEqual(fetch.call_count,3)
 
 if __name__=='__main__':unittest.main()

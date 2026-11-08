@@ -6,12 +6,19 @@ import math
 import time
 import urllib.parse
 import urllib.request
+import urllib.error
 from pathlib import Path
 
 CN=dt.timezone(dt.timedelta(hours=8))
 def request(base,params):
     req=urllib.request.Request(base+'?'+urllib.parse.urlencode(params),headers={'User-Agent':'Mozilla/5.0','Referer':'https://quote.eastmoney.com/'})
-    with urllib.request.urlopen(req,timeout=18) as response:data=json.load(response)
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(req,timeout=18) as response:data=json.load(response)
+            break
+        except (urllib.error.URLError,TimeoutError,ConnectionError):
+            if attempt==2:raise
+            time.sleep(.4*(attempt+1))
     if data.get('rc')!=0 or not data.get('data'):raise ValueError('板块源返回空数据')
     return data['data']
 
