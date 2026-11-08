@@ -74,7 +74,7 @@
     const total=items.reduce((sum,item)=>sum+item.bars.length,0);
     const latest=items.map(item=>item.last_date).sort().at(-1);
     $('#history-summary').textContent=`${items.length} 只 · ${fmt(total)} 根有效日线 · 最新至 ${latest||'—'}`;
-    $('#history-rows').innerHTML=items.map(item=>`<tr><td><button class="data-link" data-history="${item.code}">${esc(item.name)} <span class="stock-code">${item.code}</span></button></td><td>${fmt(item.bars.length)}</td><td>${item.first_date}</td><td>${item.last_date}</td><td>${stamp(item.received_at)}</td><td>${item.history_freshness==='verified'?'已核验':item.history_freshness==='market_lag'?'早于市场日期':item.history_freshness==='stale_fallback'?'更新失败·旧缓存':'缓存待核验'} · ${item.adjusted?'前复权来源标记':'未复权'} · <button class="data-link" data-history="${item.code}">K 线 / 明细</button></td></tr>`).join('');
+    $('#history-rows').innerHTML=items.map(item=>`<tr><td><button class="data-link" data-history="${item.code}">${esc(item.name)} <span class="stock-code">${item.code}</span></button></td><td>${fmt(item.bars.length)}</td><td>${item.first_date}</td><td>${item.last_date}</td><td>${stamp(item.received_at)}</td><td>${item.history_freshness==='verified'?'已核验':item.history_freshness==='market_lag'?'早于市场日期':item.history_freshness==='stale_fallback'?'更新失败·旧缓存':'缓存待核验'} · ${item.adjustment==='provider_unspecified'?'复权口径未认证':item.adjusted?'前复权来源标记':'未复权'} · <button class="data-link" data-history="${item.code}">K 线 / 明细</button></td></tr>`).join('');
     $('#history-rows').querySelectorAll('[data-history]').forEach(button=>button.onclick=()=>openHistory(button.dataset.history));
     $('#chan-code').innerHTML=items.map(item=>`<option value="${item.code}">${esc(item.name)} · ${item.code}</option>`).join('');
     currentCode=items.some(item=>item.code===currentCode)?currentCode:items[0]?.code;
@@ -93,7 +93,7 @@
     const counts=LiangceSignalReview.signalCounts(result.signals);
     const signals=result.signals.filter(signal=>filter==='all'||signal.side===filter).slice(-80).reverse();
     $('#chan-rows').innerHTML=signals.map(signal=>`<tr><td>${esc(item.name)}<div class="stock-code">${esc(signal.available_at)}</div></td><td class="${signal.side==='buy'?'up':'down'}">${esc(signal.label)}</td><td>${signal.price.toFixed(2)}</td><td>${signal.invalidation.toFixed(2)}</td><td>${signal.confirmation.trigger_price.toFixed(2)}</td><td>${esc(signal.confirmation.label)}<div class="stock-code">${esc(signal.confirmation.state_changed_at)}</div></td></tr>`).join('')||'<tr><td colspan="6" class="empty-state">当前历史范围没有满足规则的候选</td></tr>';
-    $('#chan-evidence').textContent=`${item.code} · ${item.bars.length} 根日线 · ${item.first_date} → ${item.last_date} · 分型/笔端点 ${result.points?.length||0} · 类中枢 ${result.centers?.length||0} · 候选 ${result.signals.length} · 日线规则触发有效 ${counts.proxy_confirmed} · 已失效 ${counts.by_state.invalidated} · 严格确认未实现 · ${item.adjusted?'前复权来源标记':'未复权'}`;
+    $('#chan-evidence').textContent=`${item.code} · ${item.bars.length} 根日线 · ${item.first_date} → ${item.last_date} · 分型/笔端点 ${result.points?.length||0} · 类中枢 ${result.centers?.length||0} · 候选 ${result.signals.length} · 日线规则触发有效 ${counts.proxy_confirmed} · 已失效 ${counts.by_state.invalidated} · 严格确认未实现 · ${item.adjustment==='provider_unspecified'?'复权口径未认证':item.adjusted?'前复权来源标记':'未复权'}`;
   }
 
   function openHistory(code) {

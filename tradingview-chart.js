@@ -132,7 +132,7 @@
       if(wasNew)chart.timeScale().setVisibleLogicalRange({from:Math.max(0,snapshot.bars.length-140),to:snapshot.bars.length+3});
       $('#tv-empty').hidden=snapshot.bars.length>0;
       $('#tv-asof').textContent=snapshot.as_of||'—';$('#tv-replay').max=String(Math.max(0,aggregate.length-1));$('#tv-replay').value=String(cursor==null?aggregate.length-1:cursor);
-      $('#tv-source').textContent=`${history.name||history.code} ${history.code} · ${history.history_note||'缓存待核验'} · ${history.source||'真实历史'} · ${history.adjusted?'前复权来源标记':'未复权'} · ${history.bars[0]?.date} → ${history.bars.at(-1)?.date}`;
+      $('#tv-source').textContent=`${history.name||history.code} ${history.code} · ${history.history_note||'缓存待核验'} · ${history.source||'真实历史'} · ${history.adjustment==='provider_unspecified'?'复权口径未认证':history.adjusted?'前复权来源标记':'未复权'} · ${history.bars[0]?.date} → ${history.bars.at(-1)?.date}`;
       $('#tv-status').textContent=`${snapshot.bars.length} 根${period==='D'?'日':period==='W'?'周':'月'}线 · 笔 ${snapshot.moves.length} · 类中枢 ${snapshot.centers.length} · 候选 ${snapshot.signals.length} · ${cursor==null?'最新':'历史回放'}`;
       const symbol=M.tradingViewSymbol(String(history.code));$('#tv-external').href=symbol?`https://www.tradingview.com/chart/?symbol=${encodeURIComponent(symbol)}`:'https://www.tradingview.com/';
       renderSignalReview();
@@ -249,7 +249,7 @@
   };
   window.addEventListener('liangce:histories',event=>setHistories(event.detail));
   window.addEventListener('liangce:history-selected',event=>setHistories([event.detail]));
-  setInterval(()=>{if(!screen.hidden&&history&&cursor==null&&selectionLoader.current().state!=='loading')loadCode(history.code);},60000);
+  setInterval(()=>{if(!document.hidden&&!screen.hidden&&history&&cursor==null&&selectionLoader.current().state!=='loading')loadCode(history.code);},60000);
   window.LiangceCharts={open(code){show();if(code)loadCode(code);else if(!history&&window.liangceHistory?.length)setHistories(window.liangceHistory);},getSnapshot:()=>snapshot,getDrawings:()=>manual.slice(),exportPlan,show};
   if(window.liangceHistory?.length)setHistories(window.liangceHistory);
 })();

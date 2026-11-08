@@ -182,7 +182,7 @@
     return { schema: 'liangce.tradingview.drawings.v1', symbol,
       unsupported_reason: symbol ? null : '未验证北交所在 TradingView 的代码映射；请手动核对目标股票，禁止自动绘制到猜测代码。',
       interval: PERIODS[snapshot.period], as_of: snapshot.as_of, source: history?.source ?? '',
-      source_adjustment: history?.adjusted ? 'qfq_as_labeled' : 'unadjusted',
+      source_adjustment: history?.adjustment==='provider_unspecified'?'provider_unspecified':history?.adjusted ? 'qfq_as_labeled' : 'unadjusted',
       definition_mode: snapshot.definition_mode, structure_completeness: snapshot.structure_completeness,
       approximation_loss: snapshot.approximation_loss,
       definitions: { trade_level: snapshot.trade_level, confirm_level: snapshot.confirm_level,

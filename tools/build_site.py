@@ -26,7 +26,7 @@ def export(data_dir, output):
     output.mkdir(parents=True,exist_ok=True)
     for name in ASSETS:
         p=output/name;p.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(ROOT/name,p)
-    (output/'web-config.js').write_text("window.LIANGCE_WEB_CONFIG={mode:'snapshot'};\n",encoding='utf8')
+    (output/'web-config.js').write_text("window.LIANGCE_WEB_CONFIG={mode:'snapshot',live_api:'https://liangce-v3-api-production.up.railway.app'};\n",encoding='utf8')
     (output/'.nojekyll').write_text('',encoding='utf8')
     names={item['code']:item['name'] for item in market['securities']}
     histories=[];issues=[];latest=[];bars_total=0

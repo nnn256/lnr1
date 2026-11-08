@@ -35,6 +35,7 @@
   const analysisCache = new Map();
   const batchCandidates = new Map();
   const historyStatuses = new Map();
+  const liveQuotes = new Map();
   let dataAdjustment = '待核对';
   let marketSnapshot = null,marketPage = 1;
   const loadingStocks = new Set();
@@ -96,6 +97,12 @@
       refreshCandidates();
     },
     loadMarket(market) { marketSnapshot=market;renderCandidates(); },
+    applyLiveQuotes(rows,missing=[]) {
+      for(const [code,quote] of Object.entries(rows))liveQuotes.set(code,quote);
+      for(const code of missing)if(liveQuotes.has(code))liveQuotes.set(code,{...liveQuotes.get(code),stale:true});
+      renderCandidates();renderLiveQuote();
+    },
+    markQuotesStale(codes) {for(const code of codes)if(liveQuotes.has(code))liveQuotes.set(code,{...liveQuotes.get(code),stale:true});renderCandidates();renderLiveQuote();},
     loadHistoryStatuses(items) { historyStatuses.clear();for(const item of items)historyStatuses.set(item.code,item);renderCandidates(); },
     getHistoryCount() { return universe.length; },
     selectedCode() { return selectedCandidate; },
@@ -164,7 +171,7 @@
     const combined=new Map(batchCandidates);
     candidates.forEach(candidate=>{
       const compact=combined.get(candidate.code);
-      if(!compact||compact.bar.date<candidate.bar.date)combined.set(candidate.code,candidate);
+      if(!compact||compact.bar.date<candidate.bar.date||candidate.history_freshness==='cloud_live')combined.set(candidate.code,candidate);
     });
     candidates=[...combined.values()];
     renderCandidates();
@@ -178,26 +185,27 @@
     const threshold = Number(document.querySelector('#candidate-threshold').value || 0);
     const query = document.querySelector('#candidate-search').value.trim().toLowerCase();
     const mode = document.querySelector('.filter-chip[data-candidate-filter].selected')?.dataset.candidateFilter || 'all';
-    return marketTable.queryRows(marketTable.buildRows(marketSnapshot,candidates),{
+    const rows=marketTable.buildRows(marketSnapshot,candidates).map(row=>liveQuotes.has(row.code)?{...row,quote:{...row.quote,...liveQuotes.get(row.code)}}:row);
+    return marketTable.queryRows(rows,{
       threshold,query,mode,page:marketPage,pageSize:Number(document.querySelector('#market-page-size').value),sort:document.querySelector('#market-sort').value
     });
   }
   function renderCandidates() {
     const view=currentMarketView();marketPage=view.page;
     document.querySelector('#candidate-body').innerHTML=view.rows.map(row=>{
-      const candidate=row.analysis,quote=row.quote,price=quote?.price??candidate?.bar.close,change=quote?.change??(candidate?(candidate.bar.close/candidate.bar.prevClose-1)*100:null);
+      const candidate=row.analysis,quote=row.quote,price=quote?.price??candidate?.bar.close,change=quote?.live_quote?quote.change:quote?.change??(candidate?(candidate.bar.close/candidate.bar.prevClose-1)*100:null);
       const ratio=candidate?(candidate.volumeRatio??candidate.bar.volume/candidate.indicators.volume20[candidate.index]):null;
       const historyStatus=historyStatuses.get(row.code);
       const status=loadingStocks.has(row.code)?'获取中…':candidate?candidate.status:historyStatus?.kind==='short_history'?`已获取${historyStatus.bar_count}根 · 待累计`:historyStatus?.kind==='no_history'?'行情源暂无K线':historyStatus?'数据待重试':quote?'待历史分析':'暂无有效报价';
       return `<tr data-code="${row.code}" class="${row.code===selectedCandidate?'chosen':''}" tabindex="0" aria-label="分析 ${escapeHtml(row.name)} ${row.code}">
-        <td><div class="stock-name">${escapeHtml(row.name)}</div><div class="stock-code">${row.code} · ${candidate?((candidate.history_freshness==='verified'?'K线 ':'缓存K线 ')+candidate.bar.date):quote?'全市场报价':'证券清单'}</div></td>
+        <td><div class="stock-name">${escapeHtml(row.name)}</div><div class="stock-code">${row.code} · ${quote?.live_quote?(quote.stale?'上次报价 ':'行情 ')+escapeHtml(quote.market_time?new Date(quote.market_time).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false}):'时间未提供'):candidate?((candidate.history_freshness==='verified'?'K线 ':'缓存K线 ')+candidate.bar.date):quote?'全市场报价':'证券清单'}</div></td>
         <td>${candidate?`<span class="score ${candidate.signal.score<70?'watch':''}">${candidate.signal.score}</span>`:`<span class="stock-code">${historyStatus?.kind==='short_history'?'待累计100根':'待分析'}</span>`}</td>
         <td>${price!=null?price.toFixed(2):'—'}</td><td class="${change>=0?'up':'down'}">${change!=null?Number(change).toFixed(2)+'%':'—'}</td>
         <td>${Number.isFinite(ratio)?ratio.toFixed(2):'—'}</td><td class="${candidate?.distance>=0?'up':'down'}">${candidate?percent(candidate.distance):'—'}</td>
         <td><span class="signal ${candidate?.status==='代理条件齐备'?'':'watch'}">${status}</span></td></tr>`;
     }).join('')||'<tr><td colspan="7" class="empty-state">没有匹配股票；请检查搜索词、评分或历史筛选</td></tr>';
     document.querySelector('#candidate-count').textContent=`第 ${view.start}–${view.end} 条 / 匹配 ${view.matched} 只 · 全市场 ${view.total} 只 · 有效报价 ${view.quoted} 只 · 已评分 ${view.analysed} 只`;
-    document.querySelector('#candidate-mode').textContent='后台持续完成全市场日线评分；点击任意股票查看最新历史和图表';
+    document.querySelector('#candidate-mode').textContent=window.LiangceWeb?.cloud?'当前页报价自动刷新；成交额排序和全市场评分依据已发布日线；点击股票核验云端最新闭合日线':'后台持续完成全市场日线评分；点击任意股票查看最新历史和图表';
     document.querySelector('#market-page-label').textContent=`${view.page} / ${view.pageCount} 页`;
     document.querySelector('#market-page-input').value=String(view.page);
     document.querySelector('#market-page-input').max=String(view.pageCount);
@@ -233,7 +241,16 @@
         }else selectCandidate(code);
       }
     }catch(error){if(selectedCandidate===code){document.querySelector('#plan-signal').textContent='历史未就绪';document.querySelector('#plan-rule').textContent=error.message;}}
-    finally{loadingStocks.delete(code);renderCandidates();}
+    finally{loadingStocks.delete(code);renderCandidates();renderLiveQuote();}
+  }
+
+  function renderLiveQuote(){
+    const quote=liveQuotes.get(selectedCandidate),note=document.querySelector('#plan-live-quote');
+    if(!quote){if(note)note.textContent='';return;}
+    document.querySelector('#plan-current').textContent=`¥${quote.price.toFixed(2)}`;
+    document.querySelector('#plan-change').textContent=quote.change==null?'—':`${quote.change>=0?'+':''}${quote.change.toFixed(2)}%`;
+    document.querySelector('#plan-change').className=`price-change ${quote.change>=0?'up':'down'}`;
+    if(note)note.textContent=`${quote.stale?'上次报价':'行情报价'} · ${quote.market_time?new Date(quote.market_time).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false}):'源未提供时间'} · 评分和入场方案依据下方日线日期`;
   }
 
   function selectCandidate(code) {
@@ -260,7 +277,8 @@
     document.querySelector('#plan-target').textContent = plan.valid ? `¥${plan.target.toFixed(2)}` : '—';
     document.querySelector('#plan-size').textContent = plan.valid ? `${plan.shares.toLocaleString('zh-CN')} 股 · ${money(plan.positionValue)}` : '风险预算不足';
     document.querySelector('#plan-risk').textContent = plan.valid ? `${money(plan.plannedRisk)} · ${plan.riskPct.toFixed(2)}%` : '—';
-    document.querySelector('#plan-rule').textContent = `${candidate.history_note||'缓存尚未核验最新日期'} · 历史截至 ${bar.date} · ${candidate.adjusted ? '前复权来源标记' : '未复权'}。${planClass}：MA${params.maFast}/${params.maSlow}、MACD、量比和 K 线触发共同过滤。结构失效参考前低 ${signal.structuralLow.toFixed(2)} 与 ATR(${params.atrPeriod})；信号等级为日线 proxy_research，未使用低级别触发。`;
+    document.querySelector('#plan-rule').textContent = `${candidate.history_note||'缓存尚未核验最新日期'} · 历史截至 ${bar.date} · ${candidate.adjustment==='provider_unspecified'?'复权口径未认证':candidate.adjusted ? '前复权来源标记' : '未复权'}。${planClass}：MA${params.maFast}/${params.maSlow}、MACD、量比和 K 线触发共同过滤。结构失效参考前低 ${signal.structuralLow.toFixed(2)} 与 ATR(${params.atrPeriod})；信号等级为日线 proxy_research，未使用低级别触发。`;
+    renderLiveQuote();
   }
 
   document.querySelectorAll('.filter-chip[data-candidate-filter]').forEach(button => button.addEventListener('click', () => {

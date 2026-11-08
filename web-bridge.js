@@ -2,6 +2,7 @@
  'use strict';
  if(window.pywebview?.api)return;
  const config=window.LIANGCE_WEB_CONFIG||{mode:'api'},snapshotMode=config.mode==='snapshot';
+ const cloud=snapshotMode&&config.live_api?LiangceRailway.create({baseUrl:config.live_api}):null;
  let manifest,market,scores,params={},generation=0,tokenId=0,pending=null,paused=false,completed={},issues={},queue=[],initializing,downloaded=new Map(),exports=[];
  const announce=(message,state='ready')=>window.dispatchEvent(new CustomEvent('liangce:web-status',{detail:{message,state}}));
  const json=async path=>{const response=await fetch(path,{cache:'no-store'});if(!response.ok)throw Error(response.status===404?'尚未发布这份数据':'数据读取失败 '+response.status);return response.json();};
@@ -70,7 +71,14 @@
   async complete_analysis_batch(id,token,results,errors){if(id!==String(generation)||pending?.token!==token)return {ok:false,obsolete:true};for(const r of results)completed[r.code]=r;for(const e of errors)issues[e.code]={...e,kind:'compute_error',message:e.error};pending=null;return {ok:true};},
   async control_analysis(action){if(action==='pause')paused=true;else if(action==='resume')paused=false;else if(action==='retry_failed'){await initialize(true);reset(params);}return {ok:true};},
   async get_analysis_issues(offset=0){const rows=Object.values(issues).sort((a,b)=>a.code.localeCompare(b.code));return {rows:rows.slice(offset,offset+50),total:rows.length,offset,limit:50,version:generation};},
-  async get_chart_history(code){await initialize();return history(code);},
+  async get_chart_history(code,count=1200,force=false){await initialize();
+   if(cloud&&cloud.historyMode==='live'){
+    const issue=manifest.issues.find(x=>x.code===String(code));
+    if(issue?.bar_count>0&&issue.bar_count<3){const saved=await history(code);return {...saved,history_note:`云端结构接口要求至少3根；当前展示已发布的${issue.bar_count}根日线，报价独立刷新`};}
+    return cloud.history(code,force);
+   }
+   return history(code);
+  },
   async list_v2_jobs(){return {ok:true,sources:[],jobs:[],source_id:null,message:'已发布网页未包含本机V2任务；请使用完整网页服务读取任务库'};}
  };
  async function rpc(name,args){
@@ -85,6 +93,6 @@
   if(snapshotMode)return async(...args)=>{if(!staticAPI[name])throw Error('此功能需要完整网页服务');return staticAPI[name](...args);};
   return (...args)=>rpc(name,args);
  }})};
- window.LiangceWeb={mode:snapshotMode?'snapshot':'api'};
+ window.LiangceWeb={mode:cloud?'hybrid':snapshotMode?'snapshot':'api',cloud};
  window.addEventListener('load',()=>{if(snapshotMode){document.querySelectorAll('#batch-retry,#refresh-data,#rescan-market').forEach(b=>b.textContent='检查发布更新');document.querySelector('#v2-results-screen .subtitle').textContent='本机任务可在完整网页服务中查看';const labels=document.querySelectorAll('.market-label');labels.forEach(x=>{x.innerHTML=x.innerHTML.replace('实时扫描标的','已发布标的').replace('LIVE','SNAPSHOT');});}const dir=document.querySelector('#tv-export-dir');if(dir)dir.textContent='下载记录';});
 })();
