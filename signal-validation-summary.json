@@ -1,0 +1,40 @@
+{
+  "version": "1.3.1",
+  "definition_mode": "structure_proxy",
+  "human_label_accuracy": null,
+  "forward_outcomes_computed": false,
+  "sequences": 7442,
+  "distinct_codes": 6067,
+  "bars": 7897100,
+  "candidate_events": 396175,
+  "prefix_checks": 1490,
+  "prefix_failures": 0,
+  "mirror_checks": 745,
+  "mirror_failures": 0,
+  "context_violations": 0,
+  "by_state": {
+    "waiting": 958,
+    "proxy_confirmed": 25604,
+    "invalidated": 367941,
+    "expired": 1672,
+    "superseded": 0
+  },
+  "engine_sha256": "fdae2c55fbcf8fc824506171ccff0b161f67cef568de45c1b49913a960d13cca",
+  "review_sha256": "24849b9dda2046c6712b47759af5220a6acd27897ec47cc1a26ddc87cfdf16ef",
+  "manifest_sha256": "357f586a8dc35504f1b422adec6c789a7d6cf629652808be39818aa6a2d1a8ba",
+  "notes": [
+    "Repeated stock codes in raw and adjusted cohorts are separate sequences, not independent stocks.",
+    "Every input sequence SHA256 is checked against the prior input manifest before analysis.",
+    "Class2 checks require an actually published same-side first-class parent and its unbroken raw OHLC boundary.",
+    "Class3 checks require center completion/availability before the departure start evidence; they do not assert strict Chan centers.",
+    "Lifecycle triggers are a separate later-close break rule; strict confirmation and trade authorization remain false.",
+    "Prefix checks recompute both raw candidate emission and lifecycle state using only each prefix; final future states are never compared as prefix states.",
+    "Mirror checks compare event class, date, price, lifecycle state and transition dates after price reflection.",
+    "No forward-return accuracy or original strict-Chan precision claim is made by this run."
+  ],
+  "run_recovery": {
+    "reused_sequences": 5075,
+    "discarded_incomplete_lines": 1,
+    "source_hashes_match_pilot": true
+  }
+}

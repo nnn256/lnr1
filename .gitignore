@@ -1,0 +1,15 @@
+runtime/
+verification/
+_site/
+.venv/
+.tools/
+__pycache__/
+*.pyc
+*.exe
+*.log
+*.zip
+.env
+.env.*
+!.env.example
+.DS_Store
+RECOVERY.md

@@ -1,0 +1,9 @@
+.git
+.venv
+runtime
+verification
+_site
+*.exe
+*.zip
+__pycache__
+.env*
