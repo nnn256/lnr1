@@ -3,7 +3,7 @@
  if(window.pywebview?.api)return;
  const config=window.LIANGCE_WEB_CONFIG||{mode:'api'},snapshotMode=config.mode==='snapshot';
  const cloud=snapshotMode&&config.live_api?LiangceRailway.create({baseUrl:config.live_api}):null;
- let manifest,market,scores,params={},generation=0,tokenId=0,pending=null,paused=false,completed={},issues={},queue=[],initializing,downloaded=new Map(),exports=[];
+ let manifest,market,scores,params={},generation=0,issueRevision=0,tokenId=0,pending=null,paused=false,completed={},issues={},queue=[],initializing,downloaded=new Map(),exports=[];
  const announce=(message,state='ready')=>window.dispatchEvent(new CustomEvent('liangce:web-status',{detail:{message,state}}));
  const json=async path=>{const response=await fetch(path,{cache:'no-store'});if(!response.ok)throw Error(response.status===404?'尚未发布这份数据':'数据读取失败 '+response.status);return response.json();};
  async function initialize(force=false){
@@ -15,14 +15,14 @@
   return initializing;
  }
  function reset(next){
-  params=next||{};generation++;pending=null;paused=false;
+  params=next||{};generation++;issueRevision++;pending=null;paused=false;
   if(Object.keys(params).length===0){completed=Object.fromEntries(scores.map(x=>[x.code,x]));issues=Object.fromEntries(manifest.issues.map(x=>[x.code,x]));queue=[];}
   else{completed={};issues={};queue=market.securities.slice();}
  }
  function progress(){
   const counts={};Object.values(issues).forEach(x=>counts[x.kind]=(counts[x.kind]||0)+1);
   const analysed=Object.keys(completed).length,short=counts.short_history||0,empty=counts.no_history||0,failed=Object.keys(issues).length-short-empty;
-  return {phase:paused?'paused':queue.length||pending?'running':'complete',message:'正在按已发布日线计算',total:market.securities.length,completed:analysed+Object.keys(issues).length,analysed,downloaded:analysed+short,short_history:short,no_history:empty,failed,issues_count:Object.keys(issues).length,issues_version:generation,restored:Object.keys(params).length?0:scores.length,elapsed_seconds:0,eta_seconds:null,market_day:manifest.market_day,run_id:String(generation),generation};
+  return {phase:paused?'paused':queue.length||pending?'running':'complete',message:'正在按已发布日线计算',total:market.securities.length,completed:analysed+Object.keys(issues).length,analysed,downloaded:analysed+short,short_history:short,no_history:empty,failed,issues_count:Object.keys(issues).length,issues_version:issueRevision,restored:Object.keys(params).length?0:scores.length,elapsed_seconds:0,eta_seconds:null,market_day:manifest.market_day,run_id:String(generation),generation};
  }
  async function history(code){
   code=String(code);if(!/^\d{6}$/.test(code))throw Error('请输入六位股票代码');
@@ -64,13 +64,14 @@
     const fetched=await Promise.allSettled(selected.map(x=>history(x.code)));
     if(current!==generation)return {generation,run_id:String(generation),progress:progress()};
     fetched.forEach((entry,index)=>{const item=selected[index],h=entry.value;if(entry.status==='fulfilled'&&h?.ok&&h.bars.length>=100)histories.push(h);else issues[item.code]={code:item.code,name:item.name,kind:h?.ok?'short_history':entry.status==='rejected'?'fetch_error':'no_history',bar_count:h?.bars?.length||0,first_date:h?.first_date,last_date:h?.last_date,message:h?.ok?`已获取 ${h.bars.length} 根，待累计100根`:entry.reason?.message||h?.message};});
+    if(histories.length<selected.length)issueRevision++;
     if(histories.length)pending={token:String(++tokenId),histories,params};
    }
-   return {progress:progress(),generation,run_id:String(generation),...(g!==generation?{restored_results:Object.values(completed)}:{}),history_issues:Object.values(issues),...(!paused&&pending?{batch:pending}:{})};
+   return {progress:progress(),generation,run_id:String(generation),...(g!==generation?{restored_results:Object.values(completed)}:{}),...(iv!==issueRevision?{history_issues:Object.values(issues)}:{}),...(!paused&&pending?{batch:pending}:{})};
   },
-  async complete_analysis_batch(id,token,results,errors){if(id!==String(generation)||pending?.token!==token)return {ok:false,obsolete:true};for(const r of results)completed[r.code]=r;for(const e of errors)issues[e.code]={...e,kind:'compute_error',message:e.error};pending=null;return {ok:true};},
+  async complete_analysis_batch(id,token,results,errors){if(id!==String(generation)||pending?.token!==token)return {ok:false,obsolete:true};for(const r of results)completed[r.code]=r;for(const e of errors)issues[e.code]={...e,kind:'compute_error',message:e.error};if(errors.length)issueRevision++;pending=null;return {ok:true};},
   async control_analysis(action){if(action==='pause')paused=true;else if(action==='resume')paused=false;else if(action==='retry_failed'){await initialize(true);reset(params);}return {ok:true};},
-  async get_analysis_issues(offset=0){const rows=Object.values(issues).sort((a,b)=>a.code.localeCompare(b.code));return {rows:rows.slice(offset,offset+50),total:rows.length,offset,limit:50,version:generation};},
+  async get_analysis_issues(offset=0){const rows=Object.values(issues).sort((a,b)=>a.code.localeCompare(b.code));return {rows:rows.slice(offset,offset+50),total:rows.length,offset,limit:50,version:issueRevision};},
   async get_chart_history(code,count=1200,force=false){await initialize();
    if(cloud&&cloud.historyMode==='live'){
     const issue=manifest.issues.find(x=>x.code===String(code));
