@@ -382,11 +382,17 @@
           <span class="mode-tag" id="bt-data-source"><span class="tag-dot"></span>等待真实行情数据</span>
         </div>
         <section class="panel">
+          <div class="bt-sample-controls" id="bt-sample-controls">
+            <label>回测样本<select id="bt-sample-mode" class="select"><option value="codes">指定股票</option><option value="page">当前市场页股票</option><option value="csv">已导入CSV</option></select></label>
+            <label class="bt-code-field">股票代码<input id="bt-codes" class="search" value="600519" placeholder="600519,000001" aria-label="回测股票代码"></label>
+            <button id="bt-use-selected" class="quiet-button">使用所选股票</button>
+            <span id="bt-sample-note" class="section-caption">自动获取完整历史，不受看图时的云端短历史影响；最多50只</span>
+          </div>
           <div class="bt-toolbar">
             <div><div class="section-title" style="margin-bottom:7px">比较区间</div><div class="period-options" role="group" aria-label="回测比较区间">
               <button class="range-button active" data-period="multi">多区间</button><button class="range-button" data-period="1y">近 1 年</button><button class="range-button" data-period="3y">近 3 年</button><button class="range-button" data-period="5y">近 5 年</button><button class="range-button" data-period="all">全样本</button><button class="range-button" data-period="custom">自定义</button>
             </div></div>
-            <div class="bt-controls"><div class="range-custom"><label for="bt-start">自定义</label><input id="bt-start" type="date" value="2023-01-01"><span>至</span><input id="bt-end" type="date" value="2025-12-31"></div><label class="quiet-button" for="csv-file" title="支持 date,code,open,high,low,close,volume；可选 name">导入 OHLCV CSV</label><input id="csv-file" type="file" accept=".csv,text/csv" hidden><button class="primary-button" id="run-backtest">运行回测</button><button class="quiet-button" id="export-trades" title="导出当前区间交易明细 CSV">⇩　导出</button></div>
+            <div class="bt-controls"><div class="range-custom"><label for="bt-start">自定义</label><input id="bt-start" type="date"><span>至</span><input id="bt-end" type="date"></div><label class="quiet-button" for="csv-file" title="支持 date,code,open,high,low,close,volume；可选 name">导入 OHLCV CSV</label><input id="csv-file" type="file" accept=".csv,text/csv" hidden><button class="primary-button" id="run-backtest">运行回测</button><button class="quiet-button" id="cancel-backtest" disabled>取消</button><button class="quiet-button" id="export-trades" title="导出当前区间交易明细 CSV">⇩　导出</button></div>
           </div>
           <div class="metric-grid" id="active-metrics"><div class="metric"><label>区间收益</label><b>—</b></div><div class="metric"><label>年化收益</label><b>—</b></div><div class="metric"><label>最大回撤</label><b>—</b></div><div class="metric"><label>胜率 / 笔数</label><b>—</b></div></div>
           <div class="bt-chart-wrap"><svg id="equity-chart" class="chart-large" viewBox="0 0 1000 230" preserveAspectRatio="none" role="img" aria-label="回测账户权益曲线"></svg></div>
@@ -395,7 +401,7 @@
         <div class="screen-grid" style="margin-top:16px">
           <section class="panel">
             <div class="panel-head"><div class="panel-title-wrap"><h2 class="section-title">区间对照</h2><span class="section-caption">各区间独立按初始权益起算；最新一个区间单独绘图</span></div><span class="bt-status" id="bt-status" aria-live="polite">待运行</span></div>
-            <div class="comparison"><table id="period-table"><thead><tr><th>区间</th><th>交易笔数</th><th>累计收益</th><th>CAGR</th><th>最大回撤</th><th>胜率</th><th>盈亏因子</th><th>Sharpe</th></tr></thead><tbody><tr><td colspan="8" class="empty-state">点击“运行回测”生成多区间结果</td></tr></tbody></table></div>
+            <div class="comparison"><table id="period-table"><thead><tr><th>区间 / 实际覆盖</th><th>交易笔数</th><th>累计收益</th><th>CAGR</th><th>最大回撤</th><th>胜率</th><th>盈亏因子</th><th>Sharpe</th></tr></thead><tbody><tr><td colspan="8" class="empty-state">点击“运行回测”自动取数并计算比较区间</td></tr></tbody></table></div>
           </section>
           <section class="panel">
             <div class="panel-head"><div class="panel-title-wrap"><h2 class="section-title">交易记录</h2><span class="section-caption">当前选中区间 · 含信号级别与代理说明</span></div></div>
@@ -411,6 +417,7 @@
   <script src="railway-client.js"></script>
   <script src="web-bridge.js"></script>
   <script src="strategy.js"></script>
+  <script src="backtest-model.js"></script>
   <script src="market-table.js"></script>
   <script src="app.js"></script>
   <script src="chanlun.js"></script>
@@ -423,6 +430,7 @@
   <script src="analysis-ui.js"></script>
   <script src="v2-results-ui.js"></script>
   <script src="railway-live.js"></script>
+  <script src="sectors-ui.js"></script>
 </body>
 </html>
 

@@ -57,6 +57,8 @@ def export(data_dir, output):
     for p in (output/'data/daily').glob('*.json'):
         if p.stem not in names:p.unlink()
     write(output/'data/market.json',market)
+    sector_file=data_dir/'sectors.json'
+    if sector_file.exists():write(output/'data/sectors.json',json.loads(sector_file.read_text(encoding='utf8')))
     scores=list(saved['results'].values())
     for score in scores:
         for key in ('origin','path','endpoint'):score.pop(key,None)

@@ -90,7 +90,11 @@ class WebApplication:
                     'complete_analysis_batch':batch.acknowledge,'control_analysis':batch.control,'get_analysis_issues':batch.issues}
                 read_methods={'start_background','refresh_data','get_state','get_research_report','get_chart_history','list_v2_jobs','get_v2_task_stocks','get_v2_task_result'}
                 name=path.removeprefix('/api/')
-                if name in session_methods:value=session_methods[name](*args)
+                if name=='get_sectors':
+                    sector_path=self.api.data_dir/'sectors.json'
+                    value=json.loads(sector_path.read_text(encoding='utf8')) if sector_path.exists() else dict(ok=False,message='板块历史尚未采集，请运行 python sector_data.py')
+                elif name=='get_backtest_history':value=self.api.get_chart_history(*args)
+                elif name in session_methods:value=session_methods[name](*args)
                 elif name in read_methods:value=getattr(self.api,name)(*args)
                 else:return respond('404 Not Found',{'message':'接口不存在'})
                 if name=='get_state':value['batch_analysis']=batch.snapshot()

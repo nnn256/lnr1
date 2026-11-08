@@ -45,5 +45,14 @@ class WebTests(unittest.TestCase):
         self.assertEqual(status,'200 OK');self.assertFalse(json.loads(body)['ok'])
         status,_,body=self.call('/api/control_analysis','POST',['wrong'],{'HTTP_X_LIANGCE_WEB':'1'})
         self.assertEqual(status,'400 Bad Request');self.assertNotIn('Traceback',body.decode())
+    def test_backtest_data_endpoint_uses_history_service_and_sectors_read_saved_data(self):
+        with patch.object(self.app.api,'get_chart_history',return_value={'ok':True,'bars':[]}) as history:
+            status,_,_=self.call('/api/get_backtest_history','POST',['600519'],{'HTTP_X_LIANGCE_WEB':'1'})
+            self.assertEqual(status,'200 OK');history.assert_called_once_with('600519')
+        status,_,body=self.call('/api/get_sectors','POST',headers={'HTTP_X_LIANGCE_WEB':'1'})
+        self.assertFalse(json.loads(body)['ok'])
+        (self.app.api.data_dir/'sectors.json').write_text(json.dumps({'ok':True,'rows':[{'code':'BK0459'}]}),encoding='utf8')
+        status,_,body=self.call('/api/get_sectors','POST',headers={'HTTP_X_LIANGCE_WEB':'1'})
+        self.assertEqual(json.loads(body)['rows'][0]['code'],'BK0459')
 
 if __name__=='__main__':unittest.main()

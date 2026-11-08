@@ -80,6 +80,8 @@
    }
    return history(code);
   },
+  async get_backtest_history(code){await initialize();return history(code);},
+  async get_sectors(){return json('data/sectors.json');},
   async list_v2_jobs(){return {ok:true,sources:[],jobs:[],source_id:null,message:'已发布网页未包含本机V2任务；请使用完整网页服务读取任务库'};}
  };
  async function rpc(name,args){

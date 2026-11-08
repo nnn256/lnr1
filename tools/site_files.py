@@ -1,4 +1,5 @@
 ASSETS={
+    'backtest-model.js','backtest-worker.js','sectors-ui.js',
     'index.html','app.js','strategy.js','chanlun.js','desktop-ui.js','chart-model.js',
     'tradingview-chart.js','tradingview-chart.css','signal-review.js','market-table.js',
     'analysis-model.js','analysis-worker.js','analysis-ui.js','selection-loader.js',

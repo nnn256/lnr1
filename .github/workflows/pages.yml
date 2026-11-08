@@ -38,12 +38,14 @@ jobs:
         run: go build -o ../../tdx-api-service .
       - name: Test
         run: |
-          python -m unittest test_batch_analysis test_market_runtime test_local_tdx test_v2_results test_web_server test_site_export
+          python -m unittest test_batch_analysis test_market_runtime test_local_tdx test_v2_results test_web_server test_site_export test_sector_data
           node --test '*.test.cjs'
       - name: Collect actual market data
         run: python tools/collect_snapshot.py
       - name: Build published site
-        run: python tools/build_site.py
+        run: |
+          python sector_data.py
+          python tools/build_site.py
       - name: Publish website files to the public site repository
         env:
           LIANGCE_SITE_REPOSITORY: nnn256/LiangCe-site

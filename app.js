@@ -37,6 +37,7 @@
   const historyStatuses = new Map();
   const liveQuotes = new Map();
   let dataAdjustment = '待核对';
+  let csvUniverse=[],backtestId=0,backtestWorker=null,cancelCalculation=null;
   let marketSnapshot = null,marketPage = 1;
   const loadingStocks = new Set();
 
@@ -80,14 +81,7 @@
       universe=[...mergedHistories.values()];
       if(!changed){refreshCandidates();return;}
       datasetSource = '真实历史标的';
-      backtestRuns.clear();
       rebuildPeriods();
-      document.querySelector('#bt-start').value = periodDefinitions['3y'].startDate;
-      document.querySelector('#bt-end').value = periodDefinitions['3y'].endDate;
-      dataAdjustment = [...new Set(universe.map(item => item.adjusted ? '前复权（来源标记）' : '未复权'))].join(' / ');
-      document.querySelector('#bt-data-source').textContent = `真实日线 · ${universe.length} 只 · ${dataAdjustment}`;
-      document.querySelector('#bt-status').textContent = `历史已就绪 · ${universe.length} 只 · 可运行回测`;
-      document.querySelector('#period-table tbody').innerHTML = '<tr><td colspan="8" class="empty-state">真实历史已加载，点击“运行回测”计算；样本为当前候选，存在选择偏差</td></tr>';
       refreshCandidates();
     },
     analysisParams() { return Object.fromEntries(Object.entries(readParams()).filter(([key,value])=>value!==engine.DEFAULT_PARAMS[key])); },
@@ -451,7 +445,7 @@
     renderTrades(result);
     if (key === '3y' || key === 'custom') renderOverview(result);
     document.querySelectorAll('#period-table tbody tr').forEach(row => row.classList.toggle('selected', row.dataset.period === key));
-    document.querySelector('#backtest-meta').textContent = `${result.metadata.execution}；期末未平仓 ${result.openPositions.length} 只按收盘估值。定义=${result.metadata.definition_mode}；${result.metadata.approximation_loss}。数据口径：${dataAdjustment}。当前候选样本存在选择偏差；除权口径可能影响结果。`;
+    document.querySelector('#backtest-meta').textContent = `${result.coverage_note||''}。实际回测 ${result.metrics.startDate}～${result.metrics.endDate}；${result.metrics.tradeCount?'':'本区间无成交。'}候选 ${result.signals.length} 个，风控/仓位拦截 ${result.metrics.skippedByRisk} 次，冷却拦截 ${result.metrics.skippedByCooldown} 次，涨跌停过滤 ${result.metrics.skippedByLimit} 次。${result.metadata.execution}；期末未平仓 ${result.openPositions.length} 只按收盘估值。定义=${result.metadata.definition_mode}；${result.metadata.approximation_loss}。数据口径：${result.data_adjustment||dataAdjustment}。样本由本次选择固定；存在样本选择及幸存者偏差，除权口径可能影响结果。`;
   }
 
   function renderComparison() {
@@ -461,7 +455,7 @@
       const m = result.metrics;
       const label = key === 'custom' ? `${m.startDate} 至 ${m.endDate}` : periodDefinitions[key].label;
       return `<tr data-period="${key}" class="${key === activePeriod ? 'selected' : ''}">
-        <td>${label}</td><td>${m.tradeCount}</td>
+        <td>${label}<div class="stock-code">${m.startDate} → ${m.endDate}</div></td><td>${m.tradeCount}</td>
         <td class="${m.totalReturn >= 0 ? 'up' : 'down'}">${percent(m.totalReturn)}</td>
         <td>${percent(m.cagr)}</td><td class="down">${percent(-m.maxDrawdown)}</td>
         <td>${(m.winRate * 100).toFixed(1)}%</td><td>${Number.isFinite(m.profitFactor) ? m.profitFactor.toFixed(2) : '∞'}</td><td>${m.sharpe.toFixed(2)}</td>
@@ -545,22 +539,24 @@
     const file = event.target.files?.[0];
     if (!file) return;
     const status = document.querySelector('#bt-status');
+    if(document.querySelector('#run-backtest').disabled)document.querySelector('#cancel-backtest').click();
+    clearBacktest();
     try {
       status.textContent = '正在读取 CSV…';
       const { imported, rejected } = parseCsvRows(await file.text());
-      universe = imported;
+      csvUniverse=imported.map(item=>({...item,source:'用户导入CSV',adjustment:'user_csv'}));
+      document.querySelector('#bt-sample-mode').value='csv';
       datasetSource = 'CSV 标的';
       dataAdjustment = 'CSV 口径待核对';
       backtestRuns.clear();
       activePeriod = '3y';
-      rebuildPeriods();
-      document.querySelector('#bt-start').value = periodDefinitions['3y'].startDate;
-      document.querySelector('#bt-end').value = periodDefinitions['3y'].endDate;
+      const csvRange=LiangceBacktest.ranges(csvUniverse,'3y')[0];
+      document.querySelector('#bt-start').value = csvRange.startDate;
+      document.querySelector('#bt-end').value = csvRange.endDate;
       document.querySelector('#bt-data-source').innerHTML = `<span class="tag-dot"></span>CSV · ${imported.length} 只 · ${rejected} 行忽略`;
       document.querySelector('#bt-data-source').title = 'CSV 导入数据；行情状态以首页采集结果为准';
       document.querySelector('#period-table tbody').innerHTML = '<tr><td colspan="8" class="empty-state">CSV 已加载，点击“运行回测”计算比较区间</td></tr>';
       document.querySelector('#active-metrics').innerHTML = '<div class="metric"><label>区间收益</label><b>—</b></div><div class="metric"><label>年化收益</label><b>—</b></div><div class="metric"><label>最大回撤</label><b>—</b></div><div class="metric"><label>胜率 / 笔数</label><b>—</b></div>';
-      refreshCandidates();
       status.textContent = `已加载 ${imported.length} 只股票${rejected ? `；忽略 ${rejected} 行` : ''}`;
     } catch (error) {
       status.textContent = error.message;
@@ -587,36 +583,75 @@
     document.querySelector('#run-backtest').click();
   }));
   document.querySelector('#market-screen .text-button').addEventListener('click', () => setScreen('strategy-screen'));
-  ['bt-start', 'bt-end'].forEach(id => document.querySelector('#' + id).addEventListener('change', () => {
+  ['bt-start', 'bt-end'].forEach(id => ['change','input'].forEach(event=>document.querySelector('#' + id).addEventListener(event, () => {
     document.querySelectorAll('.range-button').forEach(item => item.classList.toggle('active', item.dataset.period === 'custom'));
-  }));
+  })));
 
-  document.querySelector('#run-backtest').addEventListener('click', () => {
+  function clearBacktest(){
+    backtestRuns.clear();lastRun=null;window.liangceBacktestResult=null;document.querySelector('#equity-chart').innerHTML='';
+    document.querySelector('#active-metrics').innerHTML='<div class="metric"><label>等待本次回测</label><b>—</b></div>';
+    document.querySelector('#period-table tbody').innerHTML='<tr><td colspan="8" class="empty-state">尚无本次回测结果</td></tr>';
+    document.querySelector('#trade-table tbody').innerHTML='<tr><td colspan="5" class="empty-state">尚无本次交易记录</td></tr>';
+    document.querySelector('#backtest-meta').textContent='正在准备本次回测样本…';
+  }
+  document.querySelector('#bt-use-selected').onclick=()=>{document.querySelector('#bt-codes').value=selectedCandidate||'600519';document.querySelector('#bt-sample-mode').value='codes';};
+  document.querySelector('#cancel-backtest').onclick=()=>{
+    backtestId++;backtestWorker?.terminate();backtestWorker=null;cancelCalculation?.(Error('已取消'));cancelCalculation=null;clearBacktest();
+    document.querySelector('#bt-status').textContent='已取消';document.querySelector('#backtest-meta').textContent='本次回测已取消';
+    document.querySelector('#run-backtest').disabled=false;document.querySelector('#cancel-backtest').disabled=true;
+  };
+  document.querySelector('#run-backtest').addEventListener('click', async () => {
     const button = document.querySelector('#run-backtest');
+    if(button.disabled)return;
+    const id=++backtestId;button.disabled=true;document.querySelector('#cancel-backtest').disabled=false;clearBacktest();
     try {
       const validation = validateParams();
       if (validation) throw new Error(validation);
-      if (!universe.length) throw new Error('历史日线尚未就绪，请等待自动下载');
-      const ranges = selectedRanges();
-      button.disabled = true;
-      document.querySelector('#bt-status').textContent = '正在计算…';
-      const params = readParams();
-      ranges.forEach(range => {
-        const hasBars = universe.some(symbol => symbol.bars.some(bar => bar.date >= range.startDate && bar.date <= range.endDate));
-        if (!hasBars) throw new Error(`${range.label} 与当前数据日期无交集`);
-        backtestRuns.set(range.key, engine.runBacktest(universe, {
-          ...params, startDate: range.startDate, endDate: range.endDate
-        }));
+      const params=readParams(),mode=document.querySelector('#bt-sample-mode').value;
+      const rangeMode=document.querySelector('.range-button.active')?.dataset.period||'multi';
+      const start=document.querySelector('#bt-start').value,end=document.querySelector('#bt-end').value;
+      if(rangeMode==='custom')LiangceBacktest.validateRange(start,end);
+      let samples=[];
+      if(mode==='csv')samples=structuredClone(csvUniverse);
+      else{
+        const codes=mode==='page'?currentMarketView().rows.map(row=>row.code):LiangceBacktest.codes(document.querySelector('#bt-codes').value);
+        if(!codes.length||codes.length>50)throw Error('每次回测1～50只股票，请调整股票代码或市场每页数量');
+        const errors=[];
+        for(let offset=0;offset<codes.length;offset+=4){
+          if(id!==backtestId)return;
+          document.querySelector('#bt-status').textContent=`正在获取完整历史 ${offset}/${codes.length}`;
+          const items=await Promise.allSettled(codes.slice(offset,offset+4).map(code=>window.pywebview.api.get_backtest_history(code)));
+          if(id!==backtestId)return;
+          items.forEach((item,index)=>{const code=codes[offset+index];if(item.status!=='fulfilled'||!item.value?.ok)errors.push(code+' '+(item.reason?.message||item.value?.message||'获取失败'));else samples.push(item.value);});
+        }
+        if(errors.length)throw Error('本次样本未全部获取：'+errors.join('；'));
+      }
+      const coverage=LiangceBacktest.coverage(samples),ranges=LiangceBacktest.ranges(samples,rangeMode,start,end);
+      dataAdjustment=[...new Set(coverage.map(x=>x.adjustment==='none'?'未复权':x.adjustment==='qfq'?'前复权来源标记':'CSV口径待核对'))].join(' / ');
+      document.querySelector('#bt-data-source').textContent=`固定样本 ${samples.length} 只 · ${dataAdjustment}`;
+      document.querySelector('#bt-sample-note').textContent=coverage.map(x=>`${x.name} ${x.code}：${x.bars}根 ${x.first}～${x.last}`).join('；');
+      if(rangeMode!=='custom'){document.querySelector('#bt-start').value=ranges[0].startDate;document.querySelector('#bt-end').value=ranges[0].endDate;}
+      const worker=new Worker('backtest-worker.js'+(window.LIANGCE_ASSET_VERSION?'?v='+window.LIANGCE_ASSET_VERSION:''));backtestWorker=worker;
+      const results=await new Promise((resolve,reject)=>{
+        cancelCalculation=reject;
+        worker.onmessage=event=>{const message=event.data;if(message.id!==id||id!==backtestId)return;
+          if(message.type==='progress')document.querySelector('#bt-status').textContent=`正在计算 ${message.label} · ${message.done+1}/${message.total}`;
+          if(message.type==='error')reject(Error(message.message));if(message.type==='complete')resolve(message.results);};
+        worker.onerror=event=>reject(Error(event.message||'回测线程异常'));
+        worker.postMessage({id,universe:samples,ranges,params});
       });
+      if(id!==backtestId)return;
+      for(const row of results){row.result.data_adjustment=dataAdjustment;backtestRuns.set(row.key,row.result);}
       activePeriod = ranges.find(range => range.key === '3y')?.key || ranges[0].key;
       lastRun = backtestRuns.get(activePeriod);
       renderComparison();
       showPeriod(activePeriod);
-      document.querySelector('#bt-status').textContent = `完成 · ${ranges.length} 个区间`;
+      document.querySelector('#bt-status').textContent = `完成 · ${samples.length}只股票 · ${ranges.length}个区间`;
+      window.liangceBacktestResult={ranges:results,samples:coverage,params};
     } catch (error) {
-      document.querySelector('#bt-status').textContent = error.message;
+      if(id===backtestId){document.querySelector('#bt-status').textContent=error.message;document.querySelector('#backtest-meta').textContent='本次回测未完成：'+error.message;}
     } finally {
-      button.disabled = false;
+      if(id===backtestId){backtestWorker?.terminate();backtestWorker=null;cancelCalculation=null;button.disabled=false;document.querySelector('#cancel-backtest').disabled=true;}
     }
   });
 
