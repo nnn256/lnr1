@@ -1,0 +1,47 @@
+name: Deploy lnr1 Web 1.6.0
+on:
+  push:
+    branches: [gh-pages]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: lnr1-pages
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+      - uses: actions/configure-pages@v5
+      - name: Prepare website and pin complete history to its build
+        run: |
+          python - <<'PY'
+          import json, pathlib, re, shutil, subprocess
+          root=pathlib.Path('.');out=root/'_pages';out.mkdir()
+          for item in root.iterdir():
+              if item.is_file() and item.suffix in {'.html','.js','.css'}:shutil.copy2(item,out/item.name)
+          shutil.copytree(root/'vendor',out/'vendor')
+          (out/'data').mkdir()
+          for item in (root/'data').glob('*.json'):shutil.copy2(item,out/'data'/item.name)
+          (out/'.nojekyll').write_text('')
+          commit=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
+          config={'mode':'snapshot','live_api':'https://liangce-v3-api-production.up.railway.app','data_base':f'https://raw.githubusercontent.com/nnn256/lnr1/{commit}/'}
+          (out/'web-config.js').write_text('window.LIANGCE_WEB_CONFIG='+json.dumps(config)+';\n')
+          index=out/'index.html';index.write_text(re.sub(r'\?v=[a-f0-9]+','?v='+commit,index.read_text()))
+          print('Pages bytes:',sum(p.stat().st_size for p in out.rglob('*') if p.is_file()))
+          PY
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _pages
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

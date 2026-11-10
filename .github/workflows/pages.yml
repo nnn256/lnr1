@@ -1,53 +1,47 @@
-name: Publish LiangCe Web
+name: Deploy lnr1 Web 1.6.0
 on:
   push:
-    branches: [main]
+    branches: [gh-pages]
   workflow_dispatch:
-  schedule:
-    - cron: '20 4,7 * * 1-5'
 permissions:
   contents: read
+  pages: write
+  id-token: write
 concurrency:
-  group: liangce-pages
+  group: lnr1-pages
   cancel-in-progress: false
 jobs:
-  publish:
-    if: vars.ENABLE_PAGES == 'true'
+  deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 20
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.23.x'
-          cache-dependency-path: services/tdx-api/go.sum
-      - name: Restore recent market cache
-        uses: actions/cache@v4
-        with:
-          path: runtime/data
-          key: liangce-data-${{ github.run_id }}
-          restore-keys: liangce-data-
-      - name: Build TDX service
-        working-directory: services/tdx-api
-        run: go build -o ../../tdx-api-service .
-      - name: Test
+          ref: gh-pages
+      - uses: actions/configure-pages@v5
+      - name: Prepare website and pin complete history to its build
         run: |
-          python -m unittest test_batch_analysis test_market_runtime test_local_tdx test_v2_results test_web_server test_site_export test_sector_data
-          node --test '*.test.cjs'
-      - name: Collect actual market data
-        run: python tools/collect_snapshot.py
-      - name: Build published site
-        run: |
-          python sector_data.py
-          python tools/build_site.py
-      - name: Publish website files to the public site repository
-        env:
-          LIANGCE_SITE_REPOSITORY: nnn256/LiangCe-site
-          LIANGCE_SITE_DEPLOY_KEY: ${{ secrets.SITE_DEPLOY_KEY }}
-        run: python tools/publish_site.py
+          python - <<'PY'
+          import json, pathlib, re, shutil, subprocess
+          root=pathlib.Path('.');out=root/'_pages';out.mkdir()
+          for item in root.iterdir():
+              if item.is_file() and item.suffix in {'.html','.js','.css'}:shutil.copy2(item,out/item.name)
+          shutil.copytree(root/'vendor',out/'vendor')
+          (out/'data').mkdir()
+          for item in (root/'data').glob('*.json'):shutil.copy2(item,out/'data'/item.name)
+          (out/'.nojekyll').write_text('')
+          commit=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
+          config={'mode':'snapshot','live_api':'https://liangce-v3-api-production.up.railway.app','data_base':f'https://raw.githubusercontent.com/nnn256/lnr1/{commit}/'}
+          (out/'web-config.js').write_text('window.LIANGCE_WEB_CONFIG='+json.dumps(config)+';\n')
+          index=out/'index.html';index.write_text(re.sub(r'\?v=[a-f0-9]+','?v='+commit,index.read_text()))
+          print('Pages bytes:',sum(p.stat().st_size for p in out.rglob('*') if p.is_file()))
+          PY
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _pages
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

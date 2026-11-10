@@ -5,7 +5,8 @@
  const cloud=snapshotMode&&config.live_api?LiangceRailway.create({baseUrl:config.live_api}):null;
  let manifest,market,scores,params={},generation=0,issueRevision=0,tokenId=0,pending=null,paused=false,completed={},issues={},queue=[],initializing,downloaded=new Map(),exports=[];
  const announce=(message,state='ready')=>window.dispatchEvent(new CustomEvent('liangce:web-status',{detail:{message,state}}));
- const json=async path=>{const response=await fetch(path,{cache:'no-store'});if(!response.ok)throw Error(response.status===404?'尚未发布这份数据':'数据读取失败 '+response.status);return response.json();};
+ const dataPath=path=>config.data_base&&/^data\/daily\//.test(path)?new URL(path,config.data_base).href:path;
+ const json=async path=>{const response=await fetch(dataPath(path),{cache:'no-store'});if(!response.ok)throw Error(response.status===404?'尚未发布这份数据':'数据读取失败 '+response.status);return response.json();};
  async function initialize(force=false){
   if(force){initializing=null;downloaded.clear();}
   if(!initializing)initializing=(async()=>{

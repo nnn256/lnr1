@@ -37,6 +37,8 @@ def export(data_dir, output):
     assets={name:(output/name).read_text(encoding='utf-8-sig') for name in ASSETS}
     (output/'index.html').write_text(versioned_index(assets),encoding='utf8')
     (output/'.nojekyll').write_text('',encoding='utf8')
+    workflows=output/'.github/workflows';workflows.mkdir(parents=True,exist_ok=True)
+    shutil.copy2(ROOT/'tools/pages-deploy.yml',workflows/'pages.yml')
     names={item['code']:item['name'] for item in market['securities']}
     histories=[];issues=[];latest=[];bars_total=0
     for code,name in sorted(names.items()):
