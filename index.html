@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>量策 LiangCe Web 1.6.0 · 股票研究工作台</title>
+  <link rel="stylesheet" href="tradingview-chart.css?v=a7b34b20edeb908e">
+  <link rel="stylesheet" href="v2-results.css?v=a7b34b20edeb908e">
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #202b2a;
+      --muted: #7a8581;
+      --line: #e4e9e6;
+      --canvas: #f4f6f4;
+      --paper: #fff;
+      --sidebar: #202927;
+      --sidebar-muted: #a5afaa;
+      --teal: #087b68;
+      --teal-soft: #e5f3ef;
+      --red: #c74b4b;
+      --red-soft: #f9eceb;
+      --amber: #b87724;
+      --amber-soft: #fbf2e6;
+      --radius: 5px;
+    }
+    .fullmarket-table{max-height:620px;overflow:auto}.fullmarket-table thead{position:sticky;top:0;background:var(--paper);z-index:1}
+    .market-pagination{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.market-pagination .quiet-button{padding:5px 8px}.market-pagination .filter-chip{padding:4px 7px}.table-foot{flex-wrap:wrap;gap:10px}#candidate-body tr[data-code]{cursor:pointer}#candidate-body tr[data-code]:focus{outline:2px solid var(--teal);outline-offset:-2px}
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--canvas); color: var(--ink); font: 13px/1.45 "Microsoft YaHei", "PingFang SC", system-ui, sans-serif; text-wrap:pretty; }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    .app { min-height: 100vh; display: grid; grid-template-columns: 214px minmax(0, 1fr); }
+    aside { background: var(--sidebar); color: #f5f7f5; min-height: 100vh; padding: 20px 12px 16px; display: flex; flex-direction: column; }
+    .brand { display:flex; align-items:center; gap: 10px; padding: 0 11px 24px; font-weight: 700; font-size: 15px; letter-spacing: 0; }
+    .brand-mark { display:grid; place-items:center; width:25px; height:25px; border:1px solid #92b9ad; border-radius:4px; color:#a8d4c7; font: 700 11px/1 monospace; }
+    .nav-label { color:#84918b; font-size:10px; padding: 12px 12px 6px; letter-spacing:0; }
+    .nav { display:grid; gap:3px; }
+    .nav button { border:0; background:transparent; color:var(--sidebar-muted); text-align:left; padding:9px 12px; border-radius:4px; display:flex; align-items:center; gap:11px; font-size:12px; }
+    .nav button .glyph { color:#9ca9a3; width:15px; text-align:center; font-size:14px; }
+    .nav button.active { background:#34423d; color:white; }
+    .nav button.active .glyph { color:#9fe0ca; }
+    .nav button:hover { background:#2b3733; color:white; }
+    .nav button:disabled { cursor:not-allowed;opacity:.56; }
+    .side-bottom { margin-top:auto; border-top:1px solid #38423e; padding:14px 11px 0; color:#a5afaa; display:flex; align-items:center; gap:9px; font-size:11px; }
+    .live-dot { width:7px;height:7px;border-radius:50%;background:#67c7a6;box-shadow:0 0 0 3px #67c7a622; }
+    main { min-width:0; }
+    .topbar { height:58px; background:var(--paper); border-bottom:1px solid var(--line); display:flex;align-items:center;justify-content:space-between;padding:0 26px; }
+    .crumb { color:var(--muted); font-size:12px; }
+    .crumb b { color:var(--ink); font-weight:600; }
+    .top-right { display:flex;align-items:center;gap:16px;color:var(--muted);font-size:11px; }
+    .date { color:#58645f; }
+    .demo-label { background:var(--amber-soft); color:var(--amber); padding:4px 8px; border-radius:3px; font-size:10px; font-weight:600; }
+    .content { max-width:1500px; margin:auto; padding:23px 26px 32px; }
+    .page-head { display:flex; align-items:flex-end; justify-content:space-between; gap:12px; margin-bottom:19px; }
+    h1 { margin:0 0 3px; font-size:20px; font-weight:650; letter-spacing:0; }
+    .subtitle { color:var(--muted); font-size:11px; }
+    .head-actions { display:flex;gap:8px;align-items:center; }
+    .select, .quiet-button { height:31px; border:1px solid var(--line); background:var(--paper); border-radius:4px; padding:0 10px; color:#394642; font-size:11px; }
+    .quiet-button:hover { border-color:#9eaaa5; }
+    .primary-button:focus-visible,.quiet-button:focus-visible,.range-button:focus-visible,.filter-chip:focus-visible,.nav button:focus-visible { outline:2px solid #13856d;outline-offset:2px; }
+    .section-title { margin:0; font-size:12px; font-weight:650; }
+    .section-caption { color:var(--muted); font-size:10px; }
+    .market-strip { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); background:var(--paper); border:1px solid var(--line); border-radius:var(--radius); margin-bottom:17px; }
+    .market-item { min-width:0;padding:12px 15px;border-right:1px solid var(--line); }
+    .market-item:last-child { border-right:0; }
+    .market-label { color:var(--muted);font-size:10px;display:flex;justify-content:space-between;gap:8px; }
+    .market-value { margin-top:5px; display:flex;align-items:baseline;gap:8px; font:600 19px/1.2 ui-monospace, "SFMono-Regular", Consolas, monospace; letter-spacing:0; }
+    .market-delta { font:600 10px/1.2 "Microsoft YaHei", sans-serif; }
+    .up { color:var(--red); }
+    .down { color:var(--teal); }
+    .market-foot { color:#98a19d; font-size:9px; margin-top:4px; }
+    .work-grid { display:grid; grid-template-columns:minmax(0,1.65fr) minmax(290px,.8fr); gap:16px; align-items:start; }
+    .panel { background:var(--paper); border:1px solid var(--line); border-radius:var(--radius); min-width:0; }
+    .panel-head { display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 15px;border-bottom:1px solid var(--line); }
+    .panel-title-wrap { display:grid;gap:2px; }
+    .text-button { border:0;background:none;color:var(--teal);padding:4px 0;font-size:10px; }
+    .filters { display:flex;gap:6px;align-items:center;padding:10px 14px;border-bottom:1px solid #edf0ee;flex-wrap:wrap; }
+    .filter-chip { border:1px solid var(--line);background:#fff;color:#67736e;border-radius:3px;padding:4px 8px;font-size:10px; }
+    .filter-chip.selected { border-color:#9ccfc0;background:#eff8f5;color:var(--teal); }
+    .search { min-width:130px; width:160px; margin-left:auto; border:1px solid var(--line);border-radius:3px;padding:5px 8px;color:var(--ink);font-size:10px;outline:none; }
+    .search:focus { border-color:#73b7a3; }
+    .table-wrap { overflow:auto; }
+    table { width:100%; border-collapse:collapse; white-space:nowrap; }
+    th { background:#fafbfa;color:#7d8883;font-size:9px;font-weight:500;text-align:right;padding:9px 12px;border-bottom:1px solid var(--line); }
+    td { text-align:right;padding:11px 12px;border-bottom:1px solid #edf0ee;font:11px/1.35 ui-monospace,"SFMono-Regular",Consolas,monospace;color:#394541; }
+    th:first-child,td:first-child { text-align:left;padding-left:15px; }
+    tbody tr { cursor:pointer; }
+    tbody tr:hover { background:#f8fbf9; }
+    tbody tr.chosen { background:#f0f7f4; }
+    .stock-name { color:#25312d;font:600 11px/1.35 "Microsoft YaHei",sans-serif; }
+    .stock-code { color:#929c97;font:9px/1.4 ui-monospace,monospace; }
+    .score { display:inline-grid;place-items:center;min-width:27px;height:22px;border-radius:3px;background:var(--teal-soft);color:var(--teal);font-weight:700; }
+    .score.watch { background:var(--amber-soft);color:var(--amber); }
+    .signal { display:inline-flex;align-items:center;gap:5px;color:#53615b;font:10px/1.3 "Microsoft YaHei",sans-serif; }
+    .signal:before { content:"";width:5px;height:5px;border-radius:50%;background:#41a98b; }
+    .signal.watch:before { background:#d69a43; }
+    .table-foot { display:flex;justify-content:space-between;align-items:center;padding:9px 14px;color:#909a95;font-size:9px; }
+    .right-col { display:grid;gap:15px; }
+    .plan { padding:14px 15px 15px; }
+    .plan-head { display:flex;justify-content:space-between;align-items:flex-start;gap:8px; }
+    .plan-stock { font-size:15px;font-weight:650; }
+    .plan-code { color:var(--muted);font:10px/1.5 ui-monospace,monospace; }
+    .signal-badge { color:var(--teal);background:var(--teal-soft);border-radius:3px;padding:4px 7px;font-size:9px; }
+    .price-hero { display:flex;align-items:baseline;gap:9px;margin:18px 0 15px; }
+    .price { font:600 26px/1 ui-monospace,monospace; }
+    .price-change { color:var(--red);font:600 11px/1 ui-monospace,monospace; }
+    .plan-levels { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:11px 0; }
+    .level { padding-left:10px;border-left:1px solid var(--line); }
+    .level:first-child { padding-left:0;border:0; }
+    .level label { display:block;color:var(--muted);font-size:9px;margin-bottom:4px; }
+    .level b { font:600 12px/1.2 ui-monospace,monospace; }
+    .level small { display:block;color:#96a09b;font-size:9px;margin-top:3px; }
+    .risk-line { display:flex;justify-content:space-between;gap:8px;margin-top:12px;color:#69756f;font-size:10px; }
+    .risk-line b { color:var(--teal);font:600 10px ui-monospace,monospace; }
+    .rule-note { margin-top:12px;padding:9px;background:#f7f9f7;border-left:2px solid #a3cbbd;color:#77827d;font-size:9px;line-height:1.6; }
+    .backtest { padding:13px 15px 12px; }
+    .backtest-head { display:flex;align-items:center;justify-content:space-between; }
+    .periods { display:flex;gap:3px; }
+    .period { border:0;background:transparent;color:#88928d;font-size:9px;padding:4px 6px;border-radius:3px; }
+    .period.active { background:#eef5f2;color:var(--teal); }
+    .chart { width:100%;height:105px;margin:8px 0 2px;display:block; }
+    .chart-grid { stroke:#e9eeeb;stroke-width:1; }
+    .chart-fill { fill:url(#fill); }
+    .chart-line { fill:none;stroke:#12856c;stroke-width:2;stroke-linecap:round;stroke-linejoin:round; }
+    .chart-axis { fill:#98a19d;font:8px ui-monospace,monospace; }
+    .stats { display:grid;grid-template-columns:repeat(3,1fr);gap:7px;border-top:1px solid var(--line);padding-top:10px; }
+    .stat label { display:block;color:var(--muted);font-size:9px; }
+    .stat b { display:block;margin-top:3px;font:600 13px ui-monospace,monospace; }
+    .pending { color:#a1aaa6!important; }
+    .bottom-note { color:#98a19d;font-size:9px;padding:12px 1px 0; }
+    .screen[hidden] { display:none!important; }
+    .screen-grid { display:grid;grid-template-columns:minmax(0,1.35fr) minmax(280px,.75fr);gap:16px;align-items:start; }
+    .stack { display:grid;gap:15px; }
+    .field-grid { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 14px;padding:14px 15px; }
+    .field { min-width:0;display:grid;gap:5px; }
+    .field label { color:#68756f;font-size:10px; }
+    .field input,.field select { width:100%;height:31px;border:1px solid var(--line);border-radius:3px;background:#fff;color:var(--ink);padding:0 8px;font:11px ui-monospace,monospace; }
+    .field small { color:#9aa39f;font-size:9px;line-height:1.4; }
+    .field.wide { grid-column:1/-1; }
+    .subhead { padding:12px 15px 0;color:#283732;font-size:11px;font-weight:650; }
+    .subhead small { display:block;margin-top:2px;color:var(--muted);font-size:9px;font-weight:400; }
+    .rule-divider { border-top:1px solid var(--line);margin:0 15px; }
+    .check-row { display:flex;align-items:flex-start;gap:9px;color:#52605a;font-size:10px;line-height:1.55; }
+    .check-row input { accent-color:var(--teal);margin:2px 0 0; }
+    .primary-button { min-height:33px;border:1px solid #087b68;background:#087b68;color:white;border-radius:4px;padding:0 13px;font-size:10px;font-weight:600; }
+    .primary-button:hover { background:#066b5b; }
+    .field-actions { display:flex;align-items:center;gap:10px;padding:0 15px 15px; }
+    .feedback { color:var(--muted);font-size:9px; }
+    .method-note { padding:12px 14px;color:#66736d;font-size:10px;line-height:1.7; }
+    .method-note strong { color:#35433d; }
+    .formula { display:block;margin-top:8px;padding:8px 9px;background:#f6f8f6;color:#52615a;font:10px/1.65 ui-monospace,monospace;white-space:normal; }
+    .calc-top { display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:13px 14px 5px; }
+    .calc-top .field { gap:4px; }
+    .calc-result { padding:8px 14px 14px; }
+    .calc-result-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 12px; }
+    .calc-result-grid .risk-line { padding:8px 0;border-bottom:1px solid #edf0ee;margin:0; }
+    .calc-result-grid .risk-line b { text-align:right; }
+    .calc-foot { color:#8d9892;font-size:9px;line-height:1.55;margin-top:10px; }
+    .bt-toolbar { display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:13px 15px;border-bottom:1px solid var(--line); }
+    .period-options { display:flex;gap:4px;flex-wrap:wrap; }
+    .range-button { border:1px solid var(--line);background:white;color:#68756f;border-radius:3px;padding:6px 9px;font-size:10px; }
+    .range-button.active { color:var(--teal);border-color:#9ccfc0;background:#eff8f5; }
+    .range-custom { display:flex;align-items:center;gap:6px; }
+    .range-custom label { color:var(--muted);font-size:9px; }
+    .range-custom input { height:29px;width:123px;border:1px solid var(--line);border-radius:3px;padding:0 6px;color:#485650;font:10px ui-monospace,monospace; }
+    .bt-controls { display:flex;gap:8px;align-items:center; }
+    .bt-status { color:var(--muted);font-size:9px; }
+    .metric-grid { display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:14px 15px;border:1px solid var(--line);border-radius:4px; }
+    .metric { padding:11px 12px;border-right:1px solid var(--line); }
+    .metric:last-child { border-right:0; }
+    .metric label { color:var(--muted);font-size:9px; }
+    .metric b { display:block;margin-top:5px;font:600 16px ui-monospace,monospace; }
+    .chart-large { display:block;width:100%;height:230px; }
+    .bt-chart-wrap { padding:0 15px 10px; }
+    .bt-chart-grid { stroke:#e8edeb;stroke-width:1; }
+    .bt-chart-line { fill:none;stroke:#13856d;stroke-width:2;stroke-linejoin:round;stroke-linecap:round; }
+    .bt-chart-zero { stroke:#cad3ce;stroke-width:1;stroke-dasharray:4 4; }
+    .bt-chart-axis { fill:#8c9791;font:9px ui-monospace,monospace; }
+    .comparison { overflow:auto; }
+    .comparison th,.comparison td { text-align:right; }
+    .comparison th:first-child,.comparison td:first-child { text-align:left; }
+    .comparison td { font-size:10px; }
+    .comparison tr.selected { background:#f0f7f4; }
+    .trade-table { max-height:310px;overflow:auto; }
+    .assumption-bar { border-top:1px solid var(--line);padding:10px 14px;color:#77827d;font-size:9px;line-height:1.6; }
+    .mode-tag { display:inline-flex;align-items:center;gap:6px;color:#8a5d1d;background:var(--amber-soft);border-radius:3px;padding:4px 7px;font-size:9px; }
+    .tag-dot { width:5px;height:5px;border-radius:50%;background:#cc9344; }
+    .empty-state { padding:28px 15px;text-align:center;color:#909b95;font-size:10px; }
+    @media (max-width:1080px) {
+      .app { grid-template-columns:66px minmax(0,1fr); }
+      aside { padding-left:8px;padding-right:8px; }
+      .brand { justify-content:center;padding:0 0 24px;font-size:0; }
+      .nav-label { font-size:0;padding:10px 0; }
+      .nav button { justify-content:center;padding:10px 4px;font-size:0; }
+      .nav button .glyph { font-size:15px; }
+      .side-bottom { justify-content:center;font-size:0;padding-left:0;padding-right:0; }
+      .content { padding:20px; }
+    }
+    @media (max-width:760px) {
+      .app { display:block;padding-bottom:56px; }
+      aside { position:fixed;z-index:5;bottom:0;left:0;right:0;min-height:0;height:54px;padding:0 8px;border-top:1px solid #3a4540; }
+      .brand,.nav-label,.side-bottom { display:none; }
+      .nav { height:100%;display:flex;justify-content:space-around;align-items:center; }
+      .nav { overflow-x:auto; }
+      .nav button:not([data-screen]), .nav button[data-screen] { flex:0 0 76px;min-width:76px;height:45px;display:grid;gap:1px;justify-items:center;padding:4px 1px;font-size:9px;color:#aeb8b2; }
+      .nav button .glyph { line-height:16px; }
+      .topbar { height:49px;padding:0 14px; }
+      .top-right { gap:8px; }
+      .content { padding:16px 12px 18px; }
+      .page-head { align-items:flex-start; }
+      h1 { font-size:18px; }
+      .head-actions .select { max-width:112px; }
+      .market-strip { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .market-item { padding:10px 12px;border-bottom:1px solid var(--line); }
+      .market-item:nth-child(2) { border-right:0; }
+      .market-item:nth-child(n+3) { border-bottom:0; }
+      .work-grid { grid-template-columns:1fr; }
+      .right-col { grid-template-columns:1fr; }
+      .search { width:125px;min-width:90px; }
+      th,td { padding-right:9px;padding-left:9px; }
+      .screen-grid { grid-template-columns:1fr; }
+      .field-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .metric-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .metric:nth-child(2) { border-right:0; }
+      .metric:nth-child(-n+2) { border-bottom:1px solid var(--line); }
+      .bt-toolbar { align-items:flex-start; }
+      .chart-large { height:190px; }
+      .range-custom input { width:112px; }
+    }
+    @media (prefers-reduced-motion: reduce) { *,*::before,*::after { scroll-behavior:auto!important;transition:none!important; } }
+  </style>
+  <link rel="stylesheet" href="responsive.css?v=a7b34b20edeb908e">
+</head>
+<body>
+  <div class="app">
+    <aside>
+      <div class="brand"><span class="brand-mark">量</span>量策工作台</div>
+      <div class="nav-label">研究工作台</div>
+      <nav class="nav" aria-label="主导航">
+        <button class="active" data-screen="market-screen"><span class="glyph">▦</span>市场概况</button>
+        <button><span class="glyph">▤</span>涨停分布</button>
+        <button><span class="glyph">↻</span>板块轮动</button>
+        <button><span class="glyph">⌁</span>图表复盘</button>
+        <button><span class="glyph">⇄</span>资金流向</button>
+        <button><span class="glyph">▱</span>筹码密集</button>
+        <div class="nav-label">策略与数据</div>
+        <button data-screen="strategy-screen"><span class="glyph">☷</span>选股策略</button>
+        <button data-screen="backtest-screen"><span class="glyph">⌁</span>回测实验</button>
+        <button><span class="glyph">▧</span>股票池</button>
+      </nav>
+      <div class="side-bottom"><span class="live-dot"></span>LiangCe Web 1.6.0 · 自动采集</div>
+    </aside>
+    <main>
+      <header class="topbar">
+        <div class="crumb">工作台　/　<b>市场概况</b></div>
+        <div class="top-right"><span id="top-data-status" class="date">等待数据连接</span><span class="demo-label">LiangCe Web 1.6.0</span></div>
+      </header>
+      <div class="content screen" id="market-screen">
+        <div class="page-head">
+          <div><h1>市场概况</h1><div class="subtitle">策略信号扫描 · 交易计划 · 历史验证</div></div>
+          <div class="head-actions"><span class="mode-tag">沪深京 A 股</span><button class="quiet-button" id="rescan-market">⟳　重新扫描</button></div>
+        </div>
+        <section class="market-strip" aria-label="市场指标">
+          <div class="market-item"><div class="market-label"><span>实时扫描标的</span><span>TDX</span></div><div class="market-value" id="live-count">—</div><div class="market-foot" id="live-source">等待桥接</div></div>
+          <div class="market-item"><div class="market-label"><span>上涨 / 下跌</span><span>LIVE</span></div><div class="market-value" id="live-breadth">—</div><div class="market-foot">有效报价统计</div></div>
+          <div class="market-item"><div class="market-label"><span>领涨标的</span><span>TOP</span></div><div class="market-value" id="live-leader">—</div><div class="market-foot" id="live-leader-change">等待扫描</div></div>
+          <div class="market-item"><div class="market-label"><span>扫描时间</span><span>AS OF</span></div><div class="market-value" id="live-asof">—</div><div class="market-foot">真实行情，不是演示值</div></div>
+        </section>
+        <div class="work-grid">
+          <section class="panel">
+            <div class="panel-head"><div class="panel-title-wrap"><h2 class="section-title">全市场股票</h2><span class="section-caption">完整清单与报价 · 点击股票加载历史分析</span></div><button class="text-button">调整策略　→</button></div>
+            <div class="filters"><button class="filter-chip selected" data-candidate-filter="all">全部股票</button><button class="filter-chip" data-candidate-filter="analysed">已分析</button><button class="filter-chip" data-candidate-filter="pending">待分析</button><button class="filter-chip" data-candidate-filter="near">接近入场</button><button class="filter-chip" data-candidate-filter="observe">观察</button><select id="candidate-threshold" class="filter-chip" aria-label="评分阈值"><option value="0">全部分数</option><option value="70">评分 ≥ 70</option><option value="80">评分 ≥ 80</option></select><input id="candidate-search" class="search" placeholder="搜索代码 / 名称" aria-label="搜索股票"></div>
+            <div class="table-wrap fullmarket-table"><table>
+              <thead><tr><th>股票</th><th>评分</th><th>最新价</th><th>涨跌幅</th><th>量比</th><th>入场距离</th><th>信号</th></tr></thead>
+              <tbody id="candidate-body"><tr><td colspan="7" class="empty-state">正在连接通达信并扫描全市场…</td></tr></tbody>
+            </table></div>
+            <div class="table-foot"><span id="candidate-count">等待实时行情</span><div class="market-pagination"><label>排序 <select id="market-sort" class="filter-chip" aria-label="全市场排序"><option value="amount">成交额</option><option value="change">涨跌幅</option><option value="code">股票代码</option><option value="score">已分析评分</option></select></label><select id="market-page-size" class="filter-chip" aria-label="每页股票数"><option value="25">25 / 页</option><option value="50">50 / 页</option><option value="100">100 / 页</option></select><button id="market-prev" class="quiet-button">上一页</button><span id="market-page-label">1 / 1 页</span><input id="market-page-input" type="number" value="1" min="1" aria-label="跳转股票页码" style="width:48px;padding:4px;border:1px solid var(--line);border-radius:3px"><button id="market-next" class="quiet-button">下一页</button></div></div><div id="candidate-mode" class="assumption-bar">全市场搜索；尚未加载历史的股票显示待分析</div>
+          </section>
+          <div class="right-col">
+            <section class="panel">
+              <div class="panel-head"><div class="panel-title-wrap"><h2 class="section-title">交易计划</h2><span class="section-caption">按策略条件计算的参考价位</span></div><button class="text-button">详情</button></div>
+              <div class="plan">
+                <div class="plan-head"><div><div class="plan-stock"><span id="plan-name">—</span> <span id="plan-code" class="plan-code">—</span></div><div class="section-caption">信号评分 <b id="plan-score" style="color:var(--teal)">— / 100</b></div></div><span id="plan-signal" class="signal-badge">观察</span></div>
+                <div class="price-hero"><span id="plan-current" class="price">—</span><span id="plan-change" class="price-change">—</span></div>
+                <div class="plan-levels">
+                  <div class="level"><label>触发参考</label><b id="plan-entry">—</b><small>收盘确认后次日开盘</small></div>
+                  <div class="level"><label>结构 / ATR 止损</label><b id="plan-stop" class="down">—</b><small id="plan-stop-distance">—</small></div>
+                  <div class="level"><label>2R 目标</label><b id="plan-target" class="up">—</b><small>部分止盈参考</small></div>
+                </div>
+                <div class="risk-line"><span>计划仓位 / 股数</span><b id="plan-size">—</b></div>
+                <div class="risk-line"><span>单笔风险预算</span><b id="plan-risk">—</b></div>
+                <div id="plan-rule" class="rule-note">日线代理买点仅为研究候选，不是确定入场信号。</div>
+              </div>
+            </section>
+            <section class="panel backtest">
+              <div class="backtest-head"><div class="panel-title-wrap"><h2 class="section-title">全市场扫描</h2><span class="section-caption">实时协议报价 · 后台自动刷新</span></div><span class="mode-tag" id="scan-state">等待连接</span></div>
+              <div class="stats"><div class="stat"><label>代码数量</label><b id="scan-codes">—</b></div><div class="stat"><label>有效报价</label><b id="scan-quotes">—</b></div><div class="stat"><label>覆盖率</label><b id="scan-coverage">—</b></div></div>
+              <div class="bottom-note" id="overview-note">连接成功后在此显示实际扫描统计；未连接时明确报错，不用演示数据填充。</div>
+            </section>
+          </div>
+        </div>
+      </div>
+      <div class="content screen" id="strategy-screen" hidden>
+        <div class="page-head">
+          <div><h1>策略参数</h1><div class="subtitle">趋势过滤 → 缠论结构代理 → 入场确认 → 风险退出</div></div>
+          <span class="mode-tag"><span class="tag-dot"></span>proxy_research · 日线代理</span>
+        </div>
+        <div class="screen-grid">
+          <div class="stack">
+            <section class="panel">
+              <div class="panel-head"><div class="panel-title-wrap"><h2 class="section-title">趋势过滤与入场</h2><span class="section-caption">指标只作过滤条件，结构买点由 K 线序列代理判断</span></div></div>
+              <div class="subhead">第一层 · 趋势方向<small>快慢均线与 MACD 同向，才进入候选观察</small></div>
+              <div class="field-grid">
+                <div class="field"><label for="p-maFast">MA 快线</label><input id="p-maFast" data-param="maFast" type="number" min="5" max="100" value="20"><small>默认 20 日</small></div>
+                <div class="field"><label for="p-maSlow">MA 慢线</label><input id="p-maSlow" data-param="maSlow" type="number" min="20" max="250" value="60"><small>默认 60 日</small></div>
+                <div class="field"><label for="p-macdFast">MACD 快线</label><input id="p-macdFast" data-param="macdFast" type="number" min="3" max="30" value="12"><small>MACD 参数组</small></div>
+                <div class="field"><label for="p-macdSlow">MACD 慢线</label><input id="p-macdSlow" data-param="macdSlow" type="number" min="10" max="60" value="26"></div>
+                <div class="field"><label for="p-macdSignal">MACD 信号线</label><input id="p-macdSignal" data-param="macdSignal" type="number" min="3" max="20" value="9"></div>
+                <div class="field"><label for="p-atrPeriod">ATR 周期</label><input id="p-atrPeriod" data-param="atrPeriod" type="number" min="5" max="50" value="14"></div>
+              </div>
+              <div class="rule-divider"></div>
+              <div class="subhead">第二层 · 缠论结构与入场确认<small>日线代理不等同于严格原文定义；完整递归需要多级别 OHLCV</small></div>
+              <div class="field-grid">
+                <div class="field"><label for="p-breakoutPeriod">前高突破窗口</label><input id="p-breakoutPeriod" data-param="breakoutPeriod" type="number" min="5" max="120" value="20"><small>收盘突破过去 N 根高点</small></div>
+                <div class="field"><label for="p-volumeRatio">量能确认倍数</label><input id="p-volumeRatio" data-param="volumeRatio" type="number" min="0.5" max="5" step="0.05" value="1.15"><small>成交量 / N 日均量</small></div>
+                <div class="field"><label for="p-pullbackPct">回踩 MA20 容差 %</label><input id="p-pullbackPct" data-param="pullbackPct" type="number" min="0" max="10" step="0.1" value="1.2"></div>
+                <div class="field wide"><label class="check-row"><input id="p-requireChan" data-param="requireChan" type="checkbox" checked><span>启用类三买结构门控：中枢向上离开后回拉不重新进入，再等待 K 线转强。条件不完整时降级为观察。</span></label></div>
+              </div>
+              <div class="rule-divider"></div>
+              <div class="subhead">第三、四层 · 初始止损与盈利保护<small>前低结构点与 ATR 缓冲共同确定初始失效位</small></div>
+              <div class="field-grid">
+                <div class="field"><label for="p-atrMultiple">初始 ATR 倍数</label><input id="p-atrMultiple" data-param="atrMultiple" type="number" min="0.5" max="8" step="0.1" value="2.2"></div>
+                <div class="field"><label for="p-atrBuffer">结构点 ATR 缓冲</label><input id="p-atrBuffer" data-param="atrBuffer" type="number" min="0" max="3" step="0.05" value="0.25"></div>
+                <div class="field"><label for="p-trailingAtr">2R 后跟踪 ATR</label><input id="p-trailingAtr" data-param="trailingAtr" type="number" min="0.5" max="8" step="0.1" value="2.8"></div>
+                <div class="field"><label for="p-targetR">分批止盈触发 R</label><input id="p-targetR" data-param="targetR" type="number" min="1" max="8" step="0.25" value="2"><small>默认 2R 减半，余仓 ATR 跟踪</small></div>
+                <div class="field"><label>1R 保护</label><input value="触及 1R 后止损移至成本" disabled><small>启用中，先触发保护再判断后续 K 线</small></div>
+                <div class="field"><label>移动止盈</label><input value="2R 后最高价 - ATR × 倍数" disabled></div>
+              </div>
+              <div class="rule-divider"></div>
+              <div class="subhead">第五层 · 账户风险控制<small>按 100 股整手向下取整；组合风险以止损距离计量</small></div>
+              <div class="field-grid">
+                <div class="field"><label for="p-accountEquity">账户权益（元）</label><input id="p-accountEquity" data-param="accountEquity" type="number" min="10000" step="10000" value="1000000"></div>
+                <div class="field"><label for="p-riskPct">单笔风险 %</label><input id="p-riskPct" data-param="riskPct" type="number" min="0.1" max="5" step="0.05" value="0.75"></div>
+                <div class="field"><label for="p-maxOpenRiskPct">总持仓风险上限 %</label><input id="p-maxOpenRiskPct" data-param="maxOpenRiskPct" type="number" min="0.5" max="20" step="0.25" value="3"></div>
+                <div class="field"><label for="p-maxPositionPct">单标的仓位上限 %</label><input id="p-maxPositionPct" data-param="maxPositionPct" type="number" min="1" max="100" step="1" value="20"></div>
+                <div class="field"><label for="p-maxPositions">同时持仓数</label><input id="p-maxPositions" data-param="maxPositions" type="number" min="1" max="20" value="4"></div>
+                <div class="field"><label for="p-maxConsecutiveLosses">连续亏损暂停阈值</label><input id="p-maxConsecutiveLosses" data-param="maxConsecutiveLosses" type="number" min="1" max="10" value="3"></div>
+                <div class="field"><label for="p-cooldownBars">暂停交易天数</label><input id="p-cooldownBars" data-param="cooldownBars" type="number" min="1" max="60" value="10"></div>
+                <div class="field"><label for="p-commission">佣金率（单边）</label><input id="p-commission" data-param="commission" type="number" min="0" max="0.01" step="0.0001" value="0.0003"></div>
+                <div class="field"><label for="p-stampTax">卖出印花税</label><input id="p-stampTax" data-param="stampTax" type="number" min="0" max="0.01" step="0.0001" value="0.0005"></div>
+                <div class="field"><label for="p-slippage">单边滑点</label><input id="p-slippage" data-param="slippage" type="number" min="0" max="0.02" step="0.0005" value="0.001"></div>
+              </div>
+              <div class="field-actions"><button class="primary-button" id="save-strategy">应用策略参数</button><span class="feedback" id="strategy-feedback" aria-live="polite">参数仅保存在当前浏览器会话</span></div>
+            </section>
+            <section class="panel">
+              <div class="panel-head"><div class="panel-title-wrap"><h2 class="section-title">规则解释与近似边界</h2><span class="section-caption">先定级别，再认结构，最后叠加指标过滤</span></div></div>
+              <div class="method-note"><strong>本版运行模式：</strong>proxy_research（日线）。算法确认日线局部三根分型，交替连接摆动点形成笔代理，用三段区间重叠识别类中枢；向上离开后回拉不入并收复前 K 高点，标为“三买候选”。<br><strong>评分：</strong>MA20&gt;MA60、MACD 同向、突破/回踩、量能确认、三买结构代理各 20 分。≥80 分列为重点观察；默认结构门控打开时，实际回测入场还要求五项齐备（100 分）、信号收盘后次日开盘成交。分数是规则满足度，不是成功概率。<br><strong>明确缺失：</strong>原文包含处理规则、线段严格判定、走势类型递归、同级别力度比较/背驰门、周/日/30m/5m 区间套触发。MACD、均线、成交量只作过滤器，不定义买点。<span class="formula">单股风险预算 = 账户权益 × 单笔风险%<br>股数 = floor(风险预算 ÷ (入场价 − 止损价) ÷ 100) × 100<br>止损 = min(前低 − ATR×缓冲, 入场价 − ATR×初始倍数)</span></div>
+            </section>
+          </div>
+          <div class="stack">
+            <section class="panel">
+              <div class="panel-head"><div class="panel-title-wrap"><h2 class="section-title">止损与仓位试算</h2><span class="section-caption">输入交易假设，实时计算风险预算</span></div></div>
+              <div class="calc-top">
+                <div class="field"><label for="calc-entry">计划入场价</label><input id="calc-entry" type="number" min="0.01" step="0.01" value="100"></div>
+                <div class="field"><label for="calc-low">结构前低</label><input id="calc-low" type="number" min="0.01" step="0.01" value="96"></div>
+                <div class="field"><label for="calc-atr">ATR(14)</label><input id="calc-atr" type="number" min="0.01" step="0.01" value="2.1"></div>
+                <div class="field"><label for="calc-openRisk">已有持仓风险</label><input id="calc-openRisk" type="number" min="0" step="100" value="0"></div>
+              </div>
+              <div class="calc-result"><div class="calc-result-grid" id="calc-results"></div><div class="calc-foot" id="calc-warning">不包含跳空超出止损价、涨跌停无法成交等尾部风险。</div></div>
+            </section>
+            <section class="panel">
+              <div class="panel-head"><div class="panel-title-wrap"><h2 class="section-title">交易成本假设</h2><span class="section-caption">回测默认值可直接编辑</span></div></div>
+              <div class="method-note">佣金按每笔最低费用与成交金额比例取高；卖出端额外扣印花税；买卖各自按滑点不利成交。A 股 100 股整手和 T+1 可卖约束已纳入。<br><br><strong>当日高低点同时触发止损/止盈：</strong>按先止损处理；止损跳空按开盘价再加不利滑点。仅在 2R 条件后对剩余仓位启用 ATR 跟踪。</div>
+            </section>
+          </div>
+        </div>
+      </div>
+      <div class="content screen" id="backtest-screen" hidden>
+        <div class="page-head">
+          <div><h1>多区间回测</h1><div class="subtitle">同一策略、相同成本和风控参数，横向比较不同历史区间</div></div>
+          <span class="mode-tag" id="bt-data-source"><span class="tag-dot"></span>等待真实行情数据</span>
+        </div>
+        <section class="panel">
+          <div class="bt-sample-controls" id="bt-sample-controls">
+            <label>回测样本<select id="bt-sample-mode" class="select"><option value="codes">指定股票</option><option value="page">当前市场页股票</option><option value="csv">已导入CSV</option></select></label>
+            <label class="bt-code-field">股票代码<input id="bt-codes" class="search" value="600519" placeholder="600519,000001" aria-label="回测股票代码"></label>
+            <button id="bt-use-selected" class="quiet-button">使用所选股票</button>
+            <span id="bt-sample-note" class="section-caption">自动获取完整历史，不受看图时的云端短历史影响；最多50只</span>
+          </div>
+          <div class="bt-toolbar">
+            <div><div class="section-title" style="margin-bottom:7px">比较区间</div><div class="period-options" role="group" aria-label="回测比较区间">
+              <button class="range-button active" data-period="multi">多区间</button><button class="range-button" data-period="1y">近 1 年</button><button class="range-button" data-period="3y">近 3 年</button><button class="range-button" data-period="5y">近 5 年</button><button class="range-button" data-period="all">全样本</button><button class="range-button" data-period="custom">自定义</button>
+            </div></div>
+            <div class="bt-controls"><div class="range-custom"><label for="bt-start">自定义</label><input id="bt-start" type="date"><span>至</span><input id="bt-end" type="date"></div><label class="quiet-button" for="csv-file" title="支持 date,code,open,high,low,close,volume；可选 name">导入 OHLCV CSV</label><input id="csv-file" type="file" accept=".csv,text/csv" hidden><button class="primary-button" id="run-backtest">运行回测</button><button class="quiet-button" id="cancel-backtest" disabled>取消</button><button class="quiet-button" id="export-trades" title="导出当前区间交易明细 CSV">⇩　导出</button></div>
+          </div>
+          <div class="metric-grid" id="active-metrics"><div class="metric"><label>区间收益</label><b>—</b></div><div class="metric"><label>年化收益</label><b>—</b></div><div class="metric"><label>最大回撤</label><b>—</b></div><div class="metric"><label>胜率 / 笔数</label><b>—</b></div></div>
+          <div class="bt-chart-wrap"><svg id="equity-chart" class="chart-large" viewBox="0 0 1000 230" preserveAspectRatio="none" role="img" aria-label="回测账户权益曲线"></svg></div>
+          <div class="assumption-bar" id="backtest-meta">尚未运行回测。运行后展示成交假设、定义模式和近似损失。</div>
+        </section>
+        <div class="screen-grid" style="margin-top:16px">
+          <section class="panel">
+            <div class="panel-head"><div class="panel-title-wrap"><h2 class="section-title">区间对照</h2><span class="section-caption">各区间独立按初始权益起算；最新一个区间单独绘图</span></div><span class="bt-status" id="bt-status" aria-live="polite">待运行</span></div>
+            <div class="comparison"><table id="period-table"><thead><tr><th>区间 / 实际覆盖</th><th>交易笔数</th><th>累计收益</th><th>CAGR</th><th>最大回撤</th><th>胜率</th><th>盈亏因子</th><th>Sharpe</th></tr></thead><tbody><tr><td colspan="8" class="empty-state">点击“运行回测”自动取数并计算比较区间</td></tr></tbody></table></div>
+          </section>
+          <section class="panel">
+            <div class="panel-head"><div class="panel-title-wrap"><h2 class="section-title">交易记录</h2><span class="section-caption">当前选中区间 · 含信号级别与代理说明</span></div></div>
+            <div class="trade-table"><table id="trade-table"><thead><tr><th>标的</th><th>入场日</th><th>出场日</th><th>盈亏</th><th>退出原因</th></tr></thead><tbody><tr><td colspan="5" class="empty-state">运行回测后显示逐笔记录</td></tr></tbody></table></div>
+          </section>
+        </div>
+        <div class="bottom-note">需要真实 OHLCV 或已完成的通达信扫描后才运行回测；无数据时不生成收益数字。</div>
+      </div>
+    </main>
+  </div>
+  <script>window.LIANGCE_ASSET_VERSION="a7b34b20edeb908e";</script>
+  <script src="web-config.js?v=a7b34b20edeb908e"></script>
+  <script src="web-shell.js?v=a7b34b20edeb908e"></script>
+  <script src="railway-client.js?v=a7b34b20edeb908e"></script>
+  <script src="web-bridge.js?v=a7b34b20edeb908e"></script>
+  <script src="strategy.js?v=a7b34b20edeb908e"></script>
+  <script src="backtest-model.js?v=a7b34b20edeb908e"></script>
+  <script src="market-table.js?v=a7b34b20edeb908e"></script>
+  <script src="app.js?v=a7b34b20edeb908e"></script>
+  <script src="chanlun.js?v=a7b34b20edeb908e"></script>
+  <script src="signal-review.js?v=a7b34b20edeb908e"></script>
+  <script src="desktop-ui.js?v=a7b34b20edeb908e"></script>
+  <script src="vendor/lightweight-charts/dist/lightweight-charts.standalone.production.js?v=a7b34b20edeb908e"></script>
+  <script src="chart-model.js?v=a7b34b20edeb908e"></script>
+  <script src="selection-loader.js?v=a7b34b20edeb908e"></script>
+  <script src="tradingview-chart.js?v=a7b34b20edeb908e"></script>
+  <script src="analysis-ui.js?v=a7b34b20edeb908e"></script>
+  <script src="v2-results-ui.js?v=a7b34b20edeb908e"></script>
+  <script src="railway-live.js?v=a7b34b20edeb908e"></script>
+  <script src="sectors-ui.js?v=a7b34b20edeb908e"></script>
+</body>
+</html>
+
