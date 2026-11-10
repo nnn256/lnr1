@@ -40,7 +40,7 @@
  select.onchange=()=>{cloud.setHistoryMode(select.value);const code=LiangceCharts.getRequestedCode()||document.querySelector('#tv-code').value;if(code)LiangceCharts.open(code);};
  document.querySelector('.tv-toolbar').prepend(select);
  const quoteLine=document.createElement('div');quoteLine.className='tv-readout';quoteLine.id='cloud-chart-quote';quoteLine.textContent='行情报价正在连接…';document.querySelector('.tv-toolbar').after(quoteLine);
- const note=document.createElement('div');note.className='tv-review-note';note.textContent='云端按需核验闭合日线；盘中报价单独更新。完整长期历史可切换“已发布完整历史”，两种来源分别展示。';document.querySelector('.tv-toolbar').after(note);
+ const note=document.createElement('div');note.className='tv-review-note';note.textContent='实时API直接获取最近1200根已收盘日线，结构由本页计算；盘中报价单独更新。完整长期历史可切换“已发布完整历史”。';document.querySelector('.tv-toolbar').after(note);
  const planNote=document.createElement('div');planNote.id='plan-live-quote';planNote.className='section-caption';document.querySelector('#plan-current').parentElement.after(planNote);
  window.addEventListener('load',()=>{for(const id of ['refresh-data','rescan-market']){const button=document.getElementById(id);button.textContent='刷新行情';button.onclick=()=>refresh(true);}document.querySelector('#batch-retry').textContent='检查评分快照';refresh();});
  document.addEventListener('visibilitychange',()=>{if(!document.hidden){next=0;refresh();}});

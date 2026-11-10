@@ -32,36 +32,25 @@
    }
   }
   function convert(panel,full){
-   if(panel.symbol!==full||panel.period!=='day'||panel.source_kind==='verified_historical_snapshot')throw Error('云端未返回所选股票的最新日线');
+   if(panel.symbol!==full||panel.period!=='day'||panel.source_kind!=='live_candles'||panel.structure_computed!==false)throw Error('云端未返回所选股票的实时K线');
    const unique=new Map();
    for(const b of panel.bars||[]){
+    if(b.is_closed===false)continue;
     const date=String(b.date_cn||'').slice(0,10),values=['open','high','low','close','volume'].map(k=>b[k]);
     if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||values.some(x=>!Number.isFinite(x))||Math.min(...values.slice(0,4))<=0||b.volume<0||b.high<Math.max(b.open,b.close)||b.low>Math.min(b.open,b.close))throw Error('云端K线数据校验失败');
     unique.set(date,{date,open:b.open,high:b.high,low:b.low,close:b.close,volume:b.volume,is_closed:b.is_closed!==false});
    }
    const bars=[...unique.values()].sort((a,b)=>a.date.localeCompare(b.date));if(!bars.length)throw Error('云端没有有效日线');
    bars.forEach((b,i)=>b.prevClose=i?bars[i-1].close:b.close);
-   return {ok:true,code:full.slice(2),name:panel.name,bars,source:'Railway / market_gateway',adjusted:null,adjustment:'provider_unspecified',
+   const adjustment=panel.provenance?.adjustment||'provider_unspecified';
+   return {ok:true,code:full.slice(2),name:panel.name,bars,source:'Railway / '+(panel.provenance?.source||'tdx-api'),adjusted:adjustment==='unadjusted'?false:null,adjustment,
     volume_unit:panel.provenance?.volume_unit||'source_native',history_freshness:'cloud_live',checked_at:panel.computed_at,
     first_date:bars[0].date,last_date:bars.at(-1).date,input_sha256:panel.coverage?.input_sha256||'',score_ready:bars.length>=100,
-    history_note:`云端已核验 ${bars.length} 根闭合日线；上游复权口径未认证`,execution_allowed:false};
+    history_note:`实时API · 最近 ${bars.length} 根已收盘日线 · ${adjustment==='unadjusted'?'未复权':'上游复权口径未认证'}`,coverage:panel.coverage,execution_allowed:false};
   }
   async function loadHistory(full,force){
-   const maxAge=session==='trading_hours'?60000:300000;
-   if(!force){
-    try{const panel=await historyRequest('/api/research/panel/'+full+'/day');
-     const age=clock()-Date.parse(panel.computed_at||'');if(panel.source_kind!=='verified_historical_snapshot'&&age>=0&&age<maxAge)return convert(panel,full);
-    }catch(error){if(error.status!==404)throw error;}
-   }
-   const job=await historyRequest('/api/research/jobs',{symbol:full,period:'day',source:'live',mode:'analysis'}),deadline=clock()+180000;
-   if(!/^[a-f0-9]{32}$/.test(job.id))throw Error('云端任务编号无效');
-   while(clock()<deadline){
-    const state=await historyRequest('/api/research/jobs/'+job.id);
-    if(state.state==='failed')throw Error(state.error||'云端取数失败');
-    if(state.state==='completed')return convert(await historyRequest('/api/research/jobs/'+job.id+'/result'),full);
-    await sleep(1500);
-   }
-   throw Error('云端仍在取数，请稍后刷新；也可切换查看已发布历史');
+   const panel=await historyRequest('/api/market/candles/'+full+'?period=day&count=1200'+(force?'&refresh=true':''));
+   return convert(panel,full);
   }
   async function history(code,force=false){
    const full=symbol(code),saved=cache.get(full),maxAge=session==='trading_hours'?60000:300000;
