@@ -25,7 +25,7 @@ test('wrong symbol or invalid OHLC cannot enter a chart',async()=>{
  const invalid=panel();invalid.bars[0].high=1;const client=create({baseUrl,fetcher:async()=>response(invalid)});await assert.rejects(client.history('600519'),/校验失败/);
 });
 test('queue errors are surfaced and never relabeled as live history',async()=>{
- const client=create({baseUrl,fetcher:async(url,o)=>o.method==='POST'?response({detail:'队列已满'},429):response({},404)});await assert.rejects(client.history('600519'),/队列已满/);
+ const client=create({baseUrl,sleep:async()=>{},fetcher:async(url,o)=>o.method==='POST'?response({detail:'队列已满'},429):response({},404)});await assert.rejects(client.history('600519'),/队列已满/);
 });
 test('chart exports preserve uncertified provider adjustment',async()=>{
  const client=create({baseUrl,fetcher:async()=>response(panel())});const history=await client.history('600519'),model=require('./chart-model.js');
@@ -40,4 +40,12 @@ test('a stalled quote request times out and the next refresh can recover',async(
  }});
  await assert.rejects(client.quotes(['600519']),/响应超时/);stalled=false;
  assert.equal((await client.quotes(['600519'])).quotes['600519'].price,10);
+});
+
+test('busy history endpoint retries only twice and can recover without changing its source',async()=>{
+ let calls=0;const delays=[];
+ const client=create({baseUrl,sleep:async ms=>delays.push(ms),fetcher:async()=>++calls<3?response({detail:'繁忙'},429):response(panel())});
+ const history=await client.history('600519');assert.equal(history.code,'600519');assert.equal(history.history_freshness,'cloud_live');assert.deepEqual(delays,[2000,4000]);
+ let rejected=0;const busy=create({baseUrl,sleep:async()=>{},fetcher:async()=>{rejected++;return response({detail:'队列已满'},429);}});
+ await assert.rejects(busy.history('600519'),/队列已满/);assert.equal(rejected,3);
 });

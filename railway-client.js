@@ -25,6 +25,12 @@
    }
    return {quotes:output,missing,refresh_after_seconds:refresh,market_session:session,received_at:received,error};
   }
+  async function historyRequest(path,body){
+   for(let attempt=0;;attempt++){
+    try{return await request(path,body);}
+    catch(error){if(error.status!==429||attempt>=2)throw error;await sleep((attempt+1)*2000);}
+   }
+  }
   function convert(panel,full){
    if(panel.symbol!==full||panel.period!=='day'||panel.source_kind==='verified_historical_snapshot')throw Error('云端未返回所选股票的最新日线');
    const unique=new Map();
@@ -43,16 +49,16 @@
   async function loadHistory(full,force){
    const maxAge=session==='trading_hours'?60000:300000;
    if(!force){
-    try{const panel=await request('/api/research/panel/'+full+'/day');
+    try{const panel=await historyRequest('/api/research/panel/'+full+'/day');
      const age=clock()-Date.parse(panel.computed_at||'');if(panel.source_kind!=='verified_historical_snapshot'&&age>=0&&age<maxAge)return convert(panel,full);
     }catch(error){if(error.status!==404)throw error;}
    }
-   const job=await request('/api/research/jobs',{symbol:full,period:'day',source:'live',mode:'analysis'}),deadline=clock()+180000;
+   const job=await historyRequest('/api/research/jobs',{symbol:full,period:'day',source:'live',mode:'analysis'}),deadline=clock()+180000;
    if(!/^[a-f0-9]{32}$/.test(job.id))throw Error('云端任务编号无效');
    while(clock()<deadline){
-    const state=await request('/api/research/jobs/'+job.id);
+    const state=await historyRequest('/api/research/jobs/'+job.id);
     if(state.state==='failed')throw Error(state.error||'云端取数失败');
-    if(state.state==='completed')return convert(await request('/api/research/jobs/'+job.id+'/result'),full);
+    if(state.state==='completed')return convert(await historyRequest('/api/research/jobs/'+job.id+'/result'),full);
     await sleep(1500);
    }
    throw Error('云端仍在取数，请稍后刷新；也可切换查看已发布历史');
