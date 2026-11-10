@@ -85,9 +85,8 @@
   async get_analysis_issues(offset=0){const rows=Object.values(issues).sort((a,b)=>a.code.localeCompare(b.code));return {rows:rows.slice(offset,offset+50),total:rows.length,offset,limit:50,version:issueRevision};},
   async get_chart_history(code,count=1200,force=false){await initialize();
    if(cloud&&cloud.historyMode==='live'){
-    const issue=manifest.issues.find(x=>x.code===String(code));
-    if(issue?.bar_count>0&&issue.bar_count<3){const saved=await history(code);return {...saved,history_note:`云端结构接口要求至少3根；当前展示已发布的${issue.bar_count}根日线，报价独立刷新`};}
-    return cloud.history(code,force);
+    const value=await cloud.history(code,force),security=market.securities.find(item=>item.code===String(code));
+    return {...value,name:security?.name||value.name};
    }
    return history(code);
   },
