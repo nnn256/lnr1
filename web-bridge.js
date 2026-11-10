@@ -83,11 +83,12 @@
   async complete_analysis_batch(id,token,results,errors){if(id!==String(generation)||pending?.token!==token)return {ok:false,obsolete:true};for(const r of results)completed[r.code]=r;for(const e of errors)issues[e.code]={...e,kind:'compute_error',message:e.error};if(errors.length)issueRevision++;pending=null;return {ok:true};},
   async control_analysis(action){if(action==='pause')paused=true;else if(action==='resume')paused=false;else if(action==='retry_failed'){await initialize(true);await initializeScores();reset(params);}return {ok:true};},
   async get_analysis_issues(offset=0){const rows=Object.values(issues).sort((a,b)=>a.code.localeCompare(b.code));return {rows:rows.slice(offset,offset+50),total:rows.length,offset,limit:50,version:issueRevision};},
-  async get_chart_history(code,count=1200,force=false){await initialize();
+  async get_chart_history(code,count=1200,force=false){
    if(cloud&&cloud.historyMode==='live'){
-    const value=await cloud.history(code,force),security=market.securities.find(item=>item.code===String(code));
+    const value=await cloud.history(code,force),security=market?.securities.find(item=>item.code===String(code));
     return {...value,name:security?.name||value.name};
    }
+   await initialize();
    return history(code);
   },
   async get_backtest_history(code){await initialize();return history(code);},

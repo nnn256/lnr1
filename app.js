@@ -60,8 +60,10 @@
   rebuildPeriods();
 
   window.LiangceApp = {
-    loadHistory(histories) {
+    loadHistory(histories,selectedCode=null) {
       if (!histories.length) return;
+      const selectedHistory=histories.find(item=>item.code===selectedCode);
+      if(selectedHistory)selectedCandidate=selectedCode;
       for(const item of histories){
         if(item.bars?.length&&item.bars.length<100)historyStatuses.set(item.code,{kind:'short_history',bar_count:item.bars.length});
         else if(item.bars?.length>=100)historyStatuses.delete(item.code);
@@ -79,10 +81,14 @@
         }
       }
       universe=[...mergedHistories.values()];
-      if(!changed){refreshCandidates();return;}
-      datasetSource = '真实历史标的';
-      rebuildPeriods();
+      if(changed){datasetSource = '真实历史标的';rebuildPeriods();}
       refreshCandidates();
+      if(selectedHistory?.bars?.length<100){
+        resetPlan(selectedHistory.code,selectedHistory.name,null);
+        document.querySelector('#plan-score').textContent='待累计100根';document.querySelector('#plan-signal').textContent='K线已获取';
+        document.querySelector('#plan-rule').textContent=`已获取 ${selectedHistory.bars.length} 根真实日线；累计100根后参与评分。`;
+        renderLiveQuote();
+      }
     },
     analysisParams() { return Object.fromEntries(Object.entries(readParams()).filter(([key,value])=>value!==engine.DEFAULT_PARAMS[key])); },
     loadAnalysisSummaries(items,reset=false) {
@@ -209,18 +215,21 @@
       row.addEventListener('keydown',event=>{if(event.key==='Enter')selectMarketStock(row.dataset.code);});
     });
   }
+  function resetPlan(code,name,quote){
+    document.querySelector('#plan-name').textContent=name;document.querySelector('#plan-code').textContent=code;
+    document.querySelector('#plan-score').textContent='待历史分析';document.querySelector('#plan-signal').textContent='加载历史中';
+    document.querySelector('#plan-current').textContent=Number.isFinite(quote?.price)?`¥${quote.price.toFixed(2)}`:'—';
+    document.querySelector('#plan-change').textContent=Number.isFinite(quote?.change)?`${quote.change.toFixed(2)}%`:'—';
+    ['plan-entry','plan-stop','plan-target','plan-size','plan-risk','plan-stop-distance'].forEach(id=>document.querySelector('#'+id).textContent='—');
+    document.querySelector('#plan-rule').textContent='正在核验该股票最新K线；如本地历史过期会自动更新后计算。';
+  }
   async function selectMarketStock(code){
     if(loadingStocks.has(code)&&selectedCandidate===code){window.LiangceCharts?.show();return;}
     selectedCandidate=code;
     if(candidates.some(candidate=>candidate.code===code)){selectCandidate(code);renderCandidates();}
     const row=marketTable.buildRows(marketSnapshot,candidates).find(item=>item.code===code);
     if(!row)return;
-    document.querySelector('#plan-name').textContent=row.name;document.querySelector('#plan-code').textContent=code;
-    document.querySelector('#plan-score').textContent='待历史分析';document.querySelector('#plan-signal').textContent='加载历史中';
-    document.querySelector('#plan-current').textContent=row.quote?`¥${row.quote.price.toFixed(2)}`:'—';
-    document.querySelector('#plan-change').textContent=row.quote?`${row.quote.change.toFixed(2)}%`:'—';
-    ['plan-entry','plan-stop','plan-target','plan-size','plan-risk','plan-stop-distance'].forEach(id=>document.querySelector('#'+id).textContent='—');
-    document.querySelector('#plan-rule').textContent='正在核验该股票最新K线；如本地历史过期会自动更新后计算。';
+    resetPlan(code,row.name,row.quote);
     if(!window.pywebview?.api?.get_chart_history){document.querySelector('#plan-rule').textContent='请使用桌面版读取该股票真实历史';return;}
     loadingStocks.add(code);renderCandidates();
     try{
@@ -272,7 +281,7 @@
     document.querySelector('#plan-target').textContent = plan.valid ? `¥${plan.target.toFixed(2)}` : '—';
     document.querySelector('#plan-size').textContent = plan.valid ? `${plan.shares.toLocaleString('zh-CN')} 股 · ${money(plan.positionValue)}` : '风险预算不足';
     document.querySelector('#plan-risk').textContent = plan.valid ? `${money(plan.plannedRisk)} · ${plan.riskPct.toFixed(2)}%` : '—';
-    document.querySelector('#plan-rule').textContent = `${candidate.history_note||'缓存尚未核验最新日期'} · 历史截至 ${bar.date} · ${candidate.adjustment==='provider_unspecified'?'复权口径未认证':candidate.adjusted ? '前复权来源标记' : '未复权'}。${planClass}：MA${params.maFast}/${params.maSlow}、MACD、量比和 K 线触发共同过滤。结构失效参考前低 ${signal.structuralLow.toFixed(2)} 与 ATR(${params.atrPeriod})；信号等级为日线 proxy_research，未使用低级别触发。`;
+    document.querySelector('#plan-rule').textContent = `${candidate.history_note||'缓存尚未核验最新日期'} · 历史截至 ${bar.date} · ${candidate.adjustment_label||(candidate.adjustment==='provider_unspecified'?'复权口径未认证':candidate.adjusted ? '前复权来源标记' : '未复权')}。${planClass}：MA${params.maFast}/${params.maSlow}、MACD、量比和 K 线触发共同过滤。结构失效参考前低 ${signal.structuralLow.toFixed(2)} 与 ATR(${params.atrPeriod})；信号等级为日线 proxy_research，未使用低级别触发。`;
     renderLiveQuote();
   }
 

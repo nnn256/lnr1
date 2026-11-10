@@ -1,5 +1,5 @@
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),{webcrypto}=require('node:crypto');
-function harness({waitForScores=false}={}){
+function harness({waitForScores=false,liveHistory=null,failMarket=false}={}){
  const bars=Array.from({length:120},(_,i)=>[new Date(Date.UTC(2025,0,i+1)).toISOString().slice(0,10),10,12,9,11,100]);
  const files={
   'data/manifest.json':{market_day:'2025-04-30',generated_at:'2025-05-01',histories:['600000','600001'],issues:[{code:'600001',kind:'short_history',bar_count:1},{code:'600002',kind:'no_history',bar_count:0}]},
@@ -8,10 +8,10 @@ function harness({waitForScores=false}={}){
   'data/daily/600000.json':{code:'600000',first_date:bars[0][0],last_date:bars.at(-1)[0],bars},
   'data/daily/600001.json':{code:'600001',first_date:bars[0][0],last_date:bars[0][0],bars:bars.slice(0,1)}
  };
- const calls=[],window={LIANGCE_WEB_CONFIG:{mode:'snapshot'},dispatchEvent(){},addEventListener(){}};
+ const calls=[],window={LIANGCE_WEB_CONFIG:{mode:'snapshot',...(liveHistory?{live_api:'https://example.test'}:{})},dispatchEvent(){},addEventListener(){}};
  let releaseScores;const scoresGate=waitForScores?new Promise(resolve=>{releaseScores=resolve;}):Promise.resolve();
- const context={window,crypto:webcrypto,TextEncoder,Uint8Array,AbortController,setTimeout,clearTimeout,CustomEvent:class{},console,
-  fetch:async path=>{calls.push(path);if(path==='data/scores.json')await scoresGate;return{ok:Boolean(files[path]),status:files[path]?200:404,json:async()=>structuredClone(files[path])};}};
+ const context={window,LiangceRailway:{create:()=>({historyMode:'live',history:liveHistory})},crypto:webcrypto,TextEncoder,Uint8Array,AbortController,setTimeout,clearTimeout,CustomEvent:class{},console,
+  fetch:async path=>{calls.push(path);if(failMarket&&path==='data/market.json')throw Error('market unavailable');if(path==='data/scores.json')await scoresGate;return{ok:Boolean(files[path]),status:files[path]?200:404,json:async()=>structuredClone(files[path])};}};
  vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'web-bridge.js'),'utf8'),context);
  return {api:window.pywebview.api,calls,files,releaseScores};
 }
@@ -21,6 +21,12 @@ test('market list and chart history remain available while scoring download is p
  const state=await h.api.get_state();assert.equal(state.phase,'ready');assert.equal(state.market.securities.length,3);
  assert.equal((await h.api.get_chart_history('600000')).bars.length,120);
  h.releaseScores();await scoring;assert.equal((await h.api.get_analysis_batch()).progress.analysed,1);
+});
+
+test('real-time chart loading remains usable when the published market file is unavailable',async()=>{
+ const requested=[];const h=harness({failMarket:true,liveHistory:async code=>{requested.push(code);return {ok:true,code,name:code,bars:[{date:'2026-11-06'}]};}});
+ assert.equal((await h.api.get_chart_history('600519')).code,'600519');assert.deepEqual(requested,['600519']);
+ assert.equal(h.calls.includes('data/market.json'),false);
 });
 test('published defaults restore scores and distinguish short from empty history',async()=>{
  const h=harness();await h.api.configure_analysis({});const state=await h.api.get_analysis_batch();

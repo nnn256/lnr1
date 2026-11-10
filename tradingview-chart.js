@@ -132,7 +132,7 @@
       if(wasNew)chart.timeScale().setVisibleLogicalRange({from:Math.max(0,snapshot.bars.length-140),to:snapshot.bars.length+3});
       $('#tv-empty').hidden=snapshot.bars.length>0;
       $('#tv-asof').textContent=snapshot.as_of||'—';$('#tv-replay').max=String(Math.max(0,aggregate.length-1));$('#tv-replay').value=String(cursor==null?aggregate.length-1:cursor);
-      $('#tv-source').textContent=`${history.name||history.code} ${history.code} · ${history.history_note||'缓存待核验'} · ${history.source||'真实历史'} · ${history.adjustment==='provider_unspecified'?'复权口径未认证':history.adjusted?'前复权来源标记':'未复权'} · ${history.bars[0]?.date} → ${history.bars.at(-1)?.date}`;
+      $('#tv-source').textContent=`${history.name||history.code} ${history.code} · ${history.history_note||'缓存待核验'} · ${history.source||'真实历史'} · ${history.adjustment_label||(history.adjustment==='provider_unspecified'?'复权口径未认证':history.adjusted?'前复权来源标记':'未复权')} · ${history.bars[0]?.date} → ${history.bars.at(-1)?.date}`;
       $('#tv-status').textContent=`${snapshot.bars.length} 根${period==='D'?'日':period==='W'?'周':'月'}线 · 笔 ${snapshot.moves.length} · 类中枢 ${snapshot.centers.length} · 候选 ${snapshot.signals.length} · ${cursor==null?'最新':'历史回放'}`;
       const symbol=M.tradingViewSymbol(String(history.code));$('#tv-external').href=symbol?`https://www.tradingview.com/chart/?symbol=${encodeURIComponent(symbol)}`:'https://www.tradingview.com/';
       renderSignalReview();
@@ -145,7 +145,7 @@
     const sig=signature(item);
     if(snapshot&&history?.code===item.code&&sig===lastSignature){
       history=item;
-      $('#tv-source').textContent=`${item.name||item.code} ${item.code} · ${item.history_note||'缓存待核验'} · ${item.source} · ${item.adjustment==='provider_unspecified'?'复权口径未认证':item.adjusted?'前复权来源标记':'未复权'} · ${item.first_date} → ${item.last_date}`;
+      $('#tv-source').textContent=`${item.name||item.code} ${item.code} · ${item.history_note||'缓存待核验'} · ${item.source} · ${item.adjustment_label||(item.adjustment==='provider_unspecified'?'复权口径未认证':item.adjusted?'前复权来源标记':'未复权')} · ${item.first_date} → ${item.last_date}`;
       return;
     }
     history=item;aggregate=M.aggregateBars(item.bars,period);cursor=null;snapshot=null;lastSignature=sig;pending=null;manual=stored.get(item.code+':'+period)||[];$('#tv-code').value=item.code;$('#tv-symbol').value=item.code;render();

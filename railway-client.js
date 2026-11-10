@@ -35,18 +35,23 @@
    if(panel.symbol!==full||panel.period!=='day'||panel.source_kind!=='live_candles'||panel.structure_computed!==false)throw Error('云端未返回所选股票的实时K线');
    const unique=new Map();
    for(const b of panel.bars||[]){
+    if(typeof b.is_closed!=='boolean')throw Error('云端K线缺少收盘状态');
     if(b.is_closed===false)continue;
     const date=String(b.date_cn||'').slice(0,10),values=['open','high','low','close','volume'].map(k=>b[k]);
     if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||values.some(x=>!Number.isFinite(x))||Math.min(...values.slice(0,4))<=0||b.volume<0||b.high<Math.max(b.open,b.close)||b.low>Math.min(b.open,b.close))throw Error('云端K线数据校验失败');
-    unique.set(date,{date,open:b.open,high:b.high,low:b.low,close:b.close,volume:b.volume,is_closed:b.is_closed!==false});
+    const day=Date.parse(date+'T00:00:00Z'),closedAt=Date.parse(date+'T15:00:00+08:00');
+    if(!Number.isFinite(day)||new Date(day).toISOString().slice(0,10)!==date||closedAt>clock())throw Error('云端K线日期无效或尚未收盘');
+    if(unique.has(date)&&['open','high','low','close','volume'].some(key=>unique.get(date)[key]!==b[key]))throw Error('云端K线同日数据冲突');
+    unique.set(date,{date,open:b.open,high:b.high,low:b.low,close:b.close,volume:b.volume,is_closed:true});
    }
    const bars=[...unique.values()].sort((a,b)=>a.date.localeCompare(b.date));if(!bars.length)throw Error('云端没有有效日线');
    bars.forEach((b,i)=>b.prevClose=i?bars[i-1].close:b.close);
    const adjustment=panel.provenance?.adjustment||'provider_unspecified';
+   const adjustmentLabel=adjustment==='unadjusted'?'未复权':adjustment==='causal_split_hfq_verified_actions'?'后复权（已核验拆股）':'复权口径未认证';
    return {ok:true,code:full.slice(2),name:panel.name,bars,source:'Railway / '+(panel.provenance?.source||'tdx-api'),adjusted:adjustment==='unadjusted'?false:null,adjustment,
     volume_unit:panel.provenance?.volume_unit||'source_native',history_freshness:'cloud_live',checked_at:panel.computed_at,
     first_date:bars[0].date,last_date:bars.at(-1).date,input_sha256:panel.coverage?.input_sha256||'',score_ready:bars.length>=100,
-    history_note:`实时API · 最近 ${bars.length} 根已收盘日线 · ${adjustment==='unadjusted'?'未复权':'上游复权口径未认证'}`,coverage:panel.coverage,execution_allowed:false};
+    adjustment_label:adjustmentLabel,history_note:`实时API · 最近 ${bars.length} 根已收盘日线 · ${adjustmentLabel}`,coverage:panel.coverage,execution_allowed:false};
   }
   async function loadHistory(full,force){
    const panel=await historyRequest('/api/market/candles/'+full+'?period=day&count=1200'+(force?'&refresh=true':''));

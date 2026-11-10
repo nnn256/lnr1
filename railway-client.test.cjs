@@ -53,3 +53,23 @@ test('forming candles are excluded and provider adjustment survives direct live 
  const calls=[];const client=create({baseUrl,fetcher:async(url)=>{calls.push(url);return response(data);}});
  const value=await client.history('600519',true);assert.equal(value.bars.length,1);assert.equal(value.adjustment,'unadjusted');assert.equal(value.adjusted,false);assert.match(calls[0],/refresh=true/);
 });
+
+test('conflicting duplicates and impossible or future dates are rejected before charting',async()=>{
+ for(const mutate of [
+  p=>p.bars.push({...p.bars[0],close:1451}),
+  p=>p.bars[0].date_cn='2026-02-30 15:00',
+  p=>p.bars[0].date_cn='2099-01-01 15:00',
+  p=>delete p.bars[0].is_closed
+ ]){
+  const data=panel();mutate(data);const client=create({baseUrl,fetcher:async()=>response(data)});
+  await assert.rejects(client.history('600519'),/日期|冲突|收盘状态/);
+ }
+ const data=panel();data.bars.push({...data.bars[0]});const client=create({baseUrl,fetcher:async()=>response(data)});
+ assert.equal((await client.history('600519')).bars.length,1);
+});
+
+test('verified split-adjusted history is labelled as back-adjusted instead of unadjusted',async()=>{
+ const data=panel();data.provenance.adjustment='causal_split_hfq_verified_actions';
+ const client=create({baseUrl,fetcher:async()=>response(data)}),history=await client.history('600519');
+ assert.equal(history.adjustment,'causal_split_hfq_verified_actions');assert.match(history.adjustment_label,/后复权/);assert.match(history.history_note,/已核验拆股/);
+});
