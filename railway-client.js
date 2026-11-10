@@ -1,14 +1,15 @@
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;if(root)root.LiangceRailway=api;})(typeof globalThis!=='undefined'?globalThis:this,function(){
  'use strict';
  function symbol(code){code=String(code);if(/^(sh|sz|bj)\d{6}$/.test(code))return code;if(!/^\d{6}$/.test(code))throw Error('请输入六位股票代码');return (code.startsWith('6')?'sh':/^(4|8|92)/.test(code)?'bj':'sz')+code;}
- function create({baseUrl,fetcher=fetch,clock=()=>Date.now(),sleep=ms=>new Promise(r=>setTimeout(r,ms))}){
+ function create({baseUrl,fetcher=fetch,clock=()=>Date.now(),sleep=ms=>new Promise(r=>setTimeout(r,ms)),requestTimeoutMs=20000}){
   const base=new URL(baseUrl);if(base.protocol!=='https:')throw Error('云端接口必须使用HTTPS');
   const cache=new Map(),pending=new Map();let historyMode='live',session='outside_trading_hours';
   async function request(path,body){
-   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),90000);
+   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),requestTimeoutMs);
    try{const response=await fetcher(new URL(path,base).href,{method:body?'POST':'GET',headers:body?{'Content-Type':'application/json'}:undefined,body:body?JSON.stringify(body):undefined,credentials:'omit',cache:'no-store',signal:controller.signal});
     const data=await response.json();if(!response.ok){const error=Error(typeof data.detail==='string'?data.detail:'云端请求失败 '+response.status);error.status=response.status;throw error;}return data;
-   }finally{clearTimeout(timer);}
+   }catch(error){if(error.name==='AbortError')throw Error('云端响应超时，请点击刷新重试');throw error;}
+   finally{clearTimeout(timer);}
   }
   async function quotes(codes){
    const requested=[...new Set(codes.map(symbol))],output={},missing=[];let refresh=300,received=null,error=null;

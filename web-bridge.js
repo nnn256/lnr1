@@ -3,17 +3,27 @@
  if(window.pywebview?.api)return;
  const config=window.LIANGCE_WEB_CONFIG||{mode:'api'},snapshotMode=config.mode==='snapshot';
  const cloud=snapshotMode&&config.live_api?LiangceRailway.create({baseUrl:config.live_api}):null;
- let manifest,market,scores,params={},generation=0,issueRevision=0,tokenId=0,pending=null,paused=false,completed={},issues={},queue=[],initializing,downloaded=new Map(),exports=[];
+ let manifest,market,scores,params={},generation=0,issueRevision=0,tokenId=0,pending=null,paused=false,completed={},issues={},queue=[],initializing,scoring,downloaded=new Map(),exports=[];
  const announce=(message,state='ready')=>window.dispatchEvent(new CustomEvent('liangce:web-status',{detail:{message,state}}));
  const dataPath=path=>config.data_base&&/^data\/daily\//.test(path)?new URL(path,config.data_base).href:path;
- const json=async path=>{const response=await fetch(dataPath(path),{cache:'no-store'});if(!response.ok)throw Error(response.status===404?'尚未发布这份数据':'数据读取失败 '+response.status);return response.json();};
+ const json=async path=>{
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),30000);
+  try{const response=await fetch(dataPath(path),{cache:'no-store',signal:controller.signal});if(!response.ok)throw Error(response.status===404?'尚未发布这份数据':'数据读取失败 '+response.status);return await response.json();}
+  catch(error){if(error.name==='AbortError')throw Error('数据下载超时，请检查网络或点击重试');throw error;}
+  finally{clearTimeout(timer);}
+ };
  async function initialize(force=false){
-  if(force){initializing=null;downloaded.clear();}
+  if(force){initializing=null;scoring=null;downloaded.clear();}
   if(!initializing)initializing=(async()=>{
-   manifest=await json('data/manifest.json');[market,scores]=await Promise.all([json('data/market.json'),json('data/scores.json')]);
-   announce(`已发布数据 · 行情截至 ${manifest.market_day||'未知'} · 发布于 ${manifest.generated_at} · 此模式按发布批次更新`);
+   [manifest,market]=await Promise.all([json('data/manifest.json'),json('data/market.json')]);
+   announce(`股票列表已就绪 · 历史快照截至 ${manifest.market_day||'未知'}${cloud?' · 正在获取云端报价':''}`);
   })().catch(error=>{initializing=null;announce(error.message,'error');throw error;});
   return initializing;
+ }
+ async function initializeScores(){
+  await initialize();
+  if(!scoring)scoring=json('data/scores.json').then(value=>{scores=value;}).catch(error=>{scoring=null;throw error;});
+  return scoring;
  }
  function reset(next){
   params=next||{};generation++;issueRevision++;pending=null;paused=false;
@@ -54,12 +64,12 @@
  }
  const staticAPI={
   async start_background(){await initialize();return {ok:true};},
-  async refresh_data(){await initialize(true);reset(params);return {ok:true};},
+  async refresh_data(){await initialize(true);await initializeScores();reset(params);return {ok:true};},
   async get_state(mv=-1,hv=-1){await initialize();return {version:'1.6.0',phase:'ready',message:`已发布行情 · 截至 ${manifest.market_day}`,market_version:generation,history_version:0,progress:{done:manifest.histories.length,total:market.securities.length,failed:0},...(mv!==generation?{market}:{ }),...(hv!==0?{histories:[]}:{})};},
   async get_research_report(){return {status:'unavailable',message:'已发布网页未包含本机研究报告；可连接完整网页服务查看'};},
-  async configure_analysis(next){await initialize();reset(next);return {ok:true};},
+  async configure_analysis(next){await initializeScores();reset(next);return {ok:true};},
   async get_analysis_batch(g=-1,iv=-1){
-   await initialize();const current=generation;
+   await initializeScores();const current=generation;
    if(!pending&&!paused&&queue.length){
     const selected=queue.splice(0,12),histories=[];
     const fetched=await Promise.allSettled(selected.map(x=>history(x.code)));
@@ -71,7 +81,7 @@
    return {progress:progress(),generation,run_id:String(generation),...(g!==generation?{restored_results:Object.values(completed)}:{}),...(iv!==issueRevision?{history_issues:Object.values(issues)}:{}),...(!paused&&pending?{batch:pending}:{})};
   },
   async complete_analysis_batch(id,token,results,errors){if(id!==String(generation)||pending?.token!==token)return {ok:false,obsolete:true};for(const r of results)completed[r.code]=r;for(const e of errors)issues[e.code]={...e,kind:'compute_error',message:e.error};if(errors.length)issueRevision++;pending=null;return {ok:true};},
-  async control_analysis(action){if(action==='pause')paused=true;else if(action==='resume')paused=false;else if(action==='retry_failed'){await initialize(true);reset(params);}return {ok:true};},
+  async control_analysis(action){if(action==='pause')paused=true;else if(action==='resume')paused=false;else if(action==='retry_failed'){await initialize(true);await initializeScores();reset(params);}return {ok:true};},
   async get_analysis_issues(offset=0){const rows=Object.values(issues).sort((a,b)=>a.code.localeCompare(b.code));return {rows:rows.slice(offset,offset+50),total:rows.length,offset,limit:50,version:issueRevision};},
   async get_chart_history(code,count=1200,force=false){await initialize();
    if(cloud&&cloud.historyMode==='live'){

@@ -31,3 +31,13 @@ test('chart exports preserve uncertified provider adjustment',async()=>{
  const client=create({baseUrl,fetcher:async()=>response(panel())});const history=await client.history('600519'),model=require('./chart-model.js');
  const plan=model.buildDrawingPlan(model.buildSnapshot(history),history);assert.equal(plan.source_adjustment,'provider_unspecified');assert.equal(plan.execution_allowed,false);
 });
+
+test('a stalled quote request times out and the next refresh can recover',async()=>{
+ let stalled=true;
+ const client=create({baseUrl,requestTimeoutMs:5,fetcher:async(url,options)=>{
+  if(stalled)return new Promise((resolve,reject)=>options.signal.addEventListener('abort',()=>reject(Object.assign(Error('aborted'),{name:'AbortError'}))));
+  return response({quotes:{sh600519:{symbol:'sh600519',price:10,change_percent:1}},market_session:'outside_trading_hours'});
+ }});
+ await assert.rejects(client.quotes(['600519']),/响应超时/);stalled=false;
+ assert.equal((await client.quotes(['600519'])).quotes['600519'].price,10);
+});

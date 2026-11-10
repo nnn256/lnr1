@@ -1,5 +1,5 @@
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),{webcrypto}=require('node:crypto');
-function harness(){
+function harness({waitForScores=false}={}){
  const bars=Array.from({length:120},(_,i)=>[new Date(Date.UTC(2025,0,i+1)).toISOString().slice(0,10),10,12,9,11,100]);
  const files={
   'data/manifest.json':{market_day:'2025-04-30',generated_at:'2025-05-01',histories:['600000','600001'],issues:[{code:'600001',kind:'short_history',bar_count:1},{code:'600002',kind:'no_history',bar_count:0}]},
@@ -9,11 +9,19 @@ function harness(){
   'data/daily/600001.json':{code:'600001',first_date:bars[0][0],last_date:bars[0][0],bars:bars.slice(0,1)}
  };
  const calls=[],window={LIANGCE_WEB_CONFIG:{mode:'snapshot'},dispatchEvent(){},addEventListener(){}};
- const context={window,crypto:webcrypto,TextEncoder,Uint8Array,setTimeout,clearTimeout,CustomEvent:class{},console,
-  fetch:async path=>{calls.push(path);return{ok:Boolean(files[path]),status:files[path]?200:404,json:async()=>structuredClone(files[path])};}};
+ let releaseScores;const scoresGate=waitForScores?new Promise(resolve=>{releaseScores=resolve;}):Promise.resolve();
+ const context={window,crypto:webcrypto,TextEncoder,Uint8Array,AbortController,setTimeout,clearTimeout,CustomEvent:class{},console,
+  fetch:async path=>{calls.push(path);if(path==='data/scores.json')await scoresGate;return{ok:Boolean(files[path]),status:files[path]?200:404,json:async()=>structuredClone(files[path])};}};
  vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'web-bridge.js'),'utf8'),context);
- return {api:window.pywebview.api,calls,files};
+ return {api:window.pywebview.api,calls,files,releaseScores};
 }
+
+test('market list and chart history remain available while scoring download is pending',async()=>{
+ const h=harness({waitForScores:true});const scoring=h.api.configure_analysis({});
+ const state=await h.api.get_state();assert.equal(state.phase,'ready');assert.equal(state.market.securities.length,3);
+ assert.equal((await h.api.get_chart_history('600000')).bars.length,120);
+ h.releaseScores();await scoring;assert.equal((await h.api.get_analysis_batch()).progress.analysed,1);
+});
 test('published defaults restore scores and distinguish short from empty history',async()=>{
  const h=harness();await h.api.configure_analysis({});const state=await h.api.get_analysis_batch();
  assert.equal(state.progress.analysed,1);assert.equal(state.progress.downloaded,2);assert.equal(state.progress.short_history,1);assert.equal(state.progress.no_history,1);

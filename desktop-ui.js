@@ -5,7 +5,14 @@
   const fmt = value => Number(value || 0).toLocaleString('zh-CN', {maximumFractionDigits:2});
   const stamp = value => value ? new Date(value).toLocaleString('zh-CN', {timeZone:'Asia/Shanghai',hour12:false}) : '—';
   let marketVersion = -1, historyVersion = -1, market = null, histories = [], currentCode = null;
-  let polling = false, started = false, activeModule = null, chanSignature = '';
+  let polling = false, started = false, activeModule = null, chanSignature = '', quoteStatus = null;
+  function renderQuoteStatus(){
+    if(!quoteStatus)return;
+    $('#pipeline-message').textContent=quoteStatus.message;
+    $('#scan-state').textContent=quoteStatus.state==='ready'?'云端已连接':quoteStatus.state==='loading'?'连接云端中':'云端未更新';
+    if(quoteStatus.market_time){$('#live-asof').textContent=new Date(quoteStatus.market_time).toLocaleTimeString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false});$('#live-asof').nextElementSibling.textContent='当前页云端报价时间';}
+  }
+  window.addEventListener('liangce:quote-status',event=>{quoteStatus=event.detail;renderQuoteStatus();});
 
   const style = document.createElement('style');
   style.textContent = `.data-pipeline{margin-bottom:18px}.pipeline-top{display:flex;gap:16px;align-items:center;justify-content:space-between;padding:14px 16px}.pipeline-message{font-weight:600;color:var(--teal)}.pipeline-meta{font-size:11px;color:var(--muted);margin-top:5px}.pipeline-progress{height:3px;background:var(--line)}.pipeline-progress>span{display:block;height:100%;background:var(--teal);transition:width .2s}.history-section{margin-top:18px}.history-dialog{width:min(960px,94vw);max-height:90vh;overflow:auto;border:1px solid var(--line);border-radius:var(--radius);padding:22px;color:var(--ink);background:var(--paper)}.history-dialog::backdrop{background:#17221d88}.history-dialog svg{width:100%;height:270px;display:block;margin:20px 0}.history-dialog header{display:flex;justify-content:space-between;align-items:center;gap:16px}.data-link{border:0;background:transparent;color:var(--teal);padding:0;text-align:left}.history-badge{font-size:11px;color:var(--muted);margin:8px 0}.quote-scroll{max-height:360px;overflow:auto}.data-pipeline .quiet-button{white-space:nowrap}.history-section td{white-space:nowrap}`;
@@ -146,7 +153,7 @@
       const state=await window.pywebview.api.get_state(marketVersion,historyVersion);
       if(state.market)renderMarket(state.market);
       if(state.histories?.length){
-        
+
         renderHistory(state.histories);
       }
       marketVersion=state.market_version;historyVersion=state.history_version;
@@ -159,21 +166,24 @@
       $('#top-data-status').textContent=`${state.phase==='retry'?'数据延迟':market?.cached?'缓存行情':'行情'} ${market?.total_quotes||0} 只 · 详情历史 ${histories.length} 只`;
       $('#refresh-data').disabled=!['ready','retry','waiting'].includes(state.phase);
       $('#rescan-market').disabled=$('#refresh-data').disabled;
+      renderQuoteStatus();
     } catch(error) {
-      $('#pipeline-message').textContent='数据同步暂时中断，正在重新连接…';
-      console.error('market-state',error);
+      $('#pipeline-message').textContent=`股票列表加载失败：${error.message} · 点击刷新行情重试`;
+      $('#refresh-data').disabled=false;$('#rescan-market').disabled=false;
     } finally {polling=false;}
   }
   async function start() {
     if(started||!window.pywebview?.api)return;started=true;
-    try{await window.pywebview.api.start_background();await poll();setInterval(poll,2000);renderAudit(await window.pywebview.api.get_research_report());}
-    catch(error){started=false;$('#pipeline-message').textContent='后台启动失败，请重新打开程序';console.error(error);}
+    setInterval(poll,5000);
+    try{await window.pywebview.api.start_background();await poll();renderAudit(await window.pywebview.api.get_research_report());}
+    catch(error){$('#pipeline-message').textContent=`股票列表加载失败：${error.message} · 点击刷新行情重试`;$('#refresh-data').disabled=false;$('#rescan-market').disabled=false;}
   }
   const refresh=async()=>{if(window.pywebview?.api){await window.pywebview.api.refresh_data();await poll();}};
   $('#refresh-data').onclick=refresh;
   $('#rescan-market').onclick=refresh;
   $('#plan-name').closest('section').querySelector('.text-button').onclick=()=>openHistory($('#plan-code').textContent.trim());
   window.addEventListener('pywebviewready',start);
+  window.addEventListener('liangce:reload-market',poll);
   if(window.pywebview?.api)start();
   else setTimeout(()=>{if(!started)$('#pipeline-message').textContent='等待桌面行情连接 · 请运行 LiangCe 1.5.2';},4000);
   renderChan();
