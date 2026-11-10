@@ -14,7 +14,7 @@
   const b=document.createElement('button');b.type='button';b.textContent=label;b.onclick=()=>{if(key==='more'){menu.click();return;}const target=Array.from(sidebar.querySelectorAll('.nav button')).find(x=>x.dataset.screen===key||x.textContent.trim().includes(key));target?.click();window.scrollTo({top:0,behavior:'instant'});};bottom.append(b);
  }
  document.body.append(bottom);
- const banner=document.createElement('div');banner.className='web-data-banner';banner.id='web-data-banner';banner.setAttribute('role','status');banner.textContent='正在连接数据…';topbar.after(banner);
+ const banner=document.createElement('div');banner.className='web-data-banner';banner.id='web-data-banner';banner.setAttribute('role','status');banner.textContent='正在加载股票列表（最多30秒），评分将单独加载…';topbar.after(banner);
  document.querySelector('.side-bottom').textContent='LiangCe Web · 多端研究工作台';
  const badge=document.querySelector('.demo-label');badge.textContent='网页端';
  window.addEventListener('liangce:web-status',e=>{banner.textContent=e.detail.message;banner.dataset.state=e.detail.state||'ready';});

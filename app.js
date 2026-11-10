@@ -90,7 +90,7 @@
       for(const item of items)batchCandidates.set(item.code,item);
       refreshCandidates();
     },
-    loadMarket(market) { marketSnapshot=market;renderCandidates(); },
+    loadMarket(market) { marketSnapshot=market;renderCandidates();window.dispatchEvent(new CustomEvent('liangce:market-ready')); },
     applyLiveQuotes(rows,missing=[]) {
       for(const [code,quote] of Object.entries(rows))liveQuotes.set(code,quote);
       for(const code of missing)if(liveQuotes.has(code))liveQuotes.set(code,{...liveQuotes.get(code),stale:true});
@@ -191,7 +191,7 @@
       const ratio=candidate?(candidate.volumeRatio??candidate.bar.volume/candidate.indicators.volume20[candidate.index]):null;
       const historyStatus=historyStatuses.get(row.code);
       const status=loadingStocks.has(row.code)?'获取中…':candidate?candidate.status:historyStatus?.kind==='short_history'?`已获取${historyStatus.bar_count}根 · 待累计`:historyStatus?.kind==='no_history'?'行情源暂无K线':historyStatus?'数据待重试':quote?'待历史分析':'暂无有效报价';
-      return `<tr data-code="${row.code}" class="${row.code===selectedCandidate?'chosen':''}" tabindex="0" aria-label="分析 ${escapeHtml(row.name)} ${row.code}">
+      return `<tr data-code="${row.code}" class="${row.code===selectedCandidate?'chosen':''}" tabindex="0" aria-label="查看K线 ${escapeHtml(row.name)} ${row.code}">
         <td><div class="stock-name">${escapeHtml(row.name)}</div><div class="stock-code">${row.code} · ${quote?.live_quote?(quote.stale?'上次报价 ':'行情 ')+escapeHtml(quote.market_time?new Date(quote.market_time).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false}):'时间未提供'):candidate?((candidate.history_freshness==='verified'?'K线 ':'缓存K线 ')+candidate.bar.date):quote?'全市场报价':'证券清单'}</div></td>
         <td>${candidate?`<span class="score ${candidate.signal.score<70?'watch':''}">${candidate.signal.score}</span>`:`<span class="stock-code">${historyStatus?.kind==='short_history'?'待累计100根':'待分析'}</span>`}</td>
         <td>${price!=null?price.toFixed(2):'—'}</td><td class="${change>=0?'up':'down'}">${change!=null?Number(change).toFixed(2)+'%':'—'}</td>
@@ -210,7 +210,7 @@
     });
   }
   async function selectMarketStock(code){
-    if(loadingStocks.has(code))return;
+    if(loadingStocks.has(code)&&selectedCandidate===code){window.LiangceCharts?.show();return;}
     selectedCandidate=code;
     if(candidates.some(candidate=>candidate.code===code)){selectCandidate(code);renderCandidates();}
     const row=marketTable.buildRows(marketSnapshot,candidates).find(item=>item.code===code);
@@ -224,10 +224,11 @@
     if(!window.pywebview?.api?.get_chart_history){document.querySelector('#plan-rule').textContent='请使用桌面版读取该股票真实历史';return;}
     loadingStocks.add(code);renderCandidates();
     try{
-      const history=await window.pywebview.api.get_chart_history(code,1200);
+      const history=window.LiangceCharts?await window.LiangceCharts.open(code):await window.pywebview.api.get_chart_history(code,1200);
+      if(history?.obsolete||selectedCandidate!==code)return;
       if(!history.ok)throw Error(history.message||'历史暂不可用');
       window.LiangceApp.loadHistory([history]);
-      window.dispatchEvent(new CustomEvent('liangce:history-selected',{detail:history}));
+      if(!window.LiangceCharts)window.dispatchEvent(new CustomEvent('liangce:history-selected',{detail:history}));
       if(selectedCandidate===code){
         if(history.bars.length<100){
           document.querySelector('#plan-score').textContent='待累计100根';document.querySelector('#plan-signal').textContent='K线已获取';
@@ -281,6 +282,10 @@
   }));
   ['candidate-threshold','market-page-size','market-sort'].forEach(id=>document.querySelector('#'+id).addEventListener('change',()=>{marketPage=1;renderCandidates();}));
   document.querySelector('#candidate-search').addEventListener('input',()=>{marketPage=1;renderCandidates();});
+  document.querySelector('#candidate-search').addEventListener('keydown',event=>{
+    if(event.key!=='Enter')return;
+    const view=currentMarketView();if(view.matched===1&&view.rows.length===1)selectMarketStock(view.rows[0].code);
+  });
   document.querySelector('#market-prev').onclick=()=>{marketPage--;renderCandidates();};
   document.querySelector('#market-next').onclick=()=>{marketPage++;renderCandidates();};
   document.querySelector('#market-page-input').addEventListener('change',event=>{marketPage=Number(event.target.value)||1;renderCandidates();});

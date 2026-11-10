@@ -54,9 +54,9 @@
  }
  async function start(){
   if(started||!window.pywebview?.api)return;
-  started=true;worker=new Worker('analysis-worker.js'+(window.LIANGCE_ASSET_VERSION?'?v='+window.LIANGCE_ASSET_VERSION:''));
+  started=true;if(!worker)worker=new Worker('analysis-worker.js'+(window.LIANGCE_ASSET_VERSION?'?v='+window.LIANGCE_ASSET_VERSION:''));
   try{await pywebview.api.configure_analysis(LiangceApp.analysisParams());poll();}
-  catch(error){started=false;$('#batch-message').textContent='批量分析启动失败';console.error(error);}
+  catch(error){started=false;$('#batch-message').textContent=`评分暂未加载：${error.message} · 股票搜索和看图可继续使用`;setTimeout(start,15000);}
  }
  $('#batch-pause').onclick=()=>pywebview.api.control_analysis(paused?'resume':'pause');
  $('#batch-retry').onclick=async()=>{

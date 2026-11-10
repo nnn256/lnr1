@@ -169,6 +169,7 @@
       const request=JSON.parse(event.key),known=stored.get('history:'+request.code);
       requestedCode=request.code;
       $('#tv-code').value=request.code;
+      window.dispatchEvent(new CustomEvent('liangce:stock-requested',{detail:{code:request.code}}));
       if(known)select(known);
       else {history=null;snapshot=null;aggregate=[];if(chart){removeOverlays();candles.setData([]);volume.setData([]);markers.setMarkers([]);centerRequest();}$('#tv-source').textContent=request.code+' · 正在读取历史';$('#tv-empty').hidden=false;$('#tv-empty').textContent='正在加载 '+request.code+' 的真实历史…';$('#tv-events').innerHTML='';$('#tv-detail').textContent='等待该股票结果';$('#tv-readout').textContent='正在加载 '+request.code;}
       $('#tv-status').textContent='正在核验 '+request.code+' 的最新K线…';
@@ -250,6 +251,6 @@
   window.addEventListener('liangce:histories',event=>setHistories(event.detail));
   window.addEventListener('liangce:history-selected',event=>setHistories([event.detail]));
   setInterval(()=>{if(!document.hidden&&!screen.hidden&&history&&cursor==null&&selectionLoader.current().state!=='loading')loadCode(history.code);},60000);
-  window.LiangceCharts={open(code){show();if(code)loadCode(code);else if(!history&&window.liangceHistory?.length)setHistories(window.liangceHistory);},getSnapshot:()=>snapshot,getDrawings:()=>manual.slice(),exportPlan,show};
+  window.LiangceCharts={open(code){show();if(code)return loadCode(code);if(!history&&window.liangceHistory?.length)setHistories(window.liangceHistory);},getSnapshot:()=>snapshot,getRequestedCode:()=>requestedCode||history?.code,getDrawings:()=>manual.slice(),exportPlan,show};
   if(window.liangceHistory?.length)setHistories(window.liangceHistory);
 })();
